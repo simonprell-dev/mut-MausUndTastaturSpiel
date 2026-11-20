@@ -1,0 +1,13 @@
+{
+  "name": "klammi-exe",
+  "version": "1.0.0",
+  "description": "KLAMMI.exe – Chaos im System. Retro-Lernspiel für Maus und Tastatur.",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tools/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

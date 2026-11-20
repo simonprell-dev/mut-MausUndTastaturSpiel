@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>KLAMMI.exe – Admin</title>
+<style>
+  :root { --bg: #17191C; --win: #DEDBD0; --title: #272D48; --text: #151515; --green: #A8F18D; --orange: #F8A945; --dark: #BD6B29; --shade: #8E8B82; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Courier New", monospace; padding: 16px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .win { background: var(--win); border: 2px solid var(--text); box-shadow: 6px 6px 0 rgba(0,0,0,.4); margin-bottom: 20px; }
+  .win > h2 { margin: 0; padding: 6px 10px; background: var(--title); color: #fff; font-size: 15px; letter-spacing: 1px; }
+  .body { padding: 14px; }
+  input, button { font: inherit; padding: 7px 12px; border: 2px solid var(--text); background: #fff; }
+  button { background: var(--win); cursor: pointer; }
+  button:hover { background: var(--green); }
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; }
+  .stat { flex: 1 1 150px; background: #fff; border: 2px solid var(--text); padding: 10px; }
+  .stat b { display: block; font-size: 28px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--shade); vertical-align: top; }
+  th { background: var(--title); color: #fff; font-weight: normal; }
+  td.text { word-break: break-word; }
+  .stars { color: var(--dark); white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  #msg { color: var(--dark); margin-top: 8px; min-height: 1.4em; }
+  .hidden { display: none; }
+  .del { padding: 2px 8px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="win" id="login">
+    <h2>KLAMMI.exe – ADMIN</h2>
+    <div class="body">
+      <form id="form">
+        <label for="pw">Passwort</label><br>
+        <input id="pw" type="password" autocomplete="current-password" autofocus>
+        <button type="submit">Anmelden</button>
+      </form>
+      <div id="msg"></div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="win">
+      <h2>ÜBERSICHT</h2>
+      <div class="body">
+        <div class="stats">
+          <div class="stat"><b id="sStarts">0</b>Spiele gestartet</div>
+          <div class="stat"><b id="sFinishes">0</b>Spiele beendet</div>
+          <div class="stat"><b id="sRate">–</b>schaffen es bis zum Ende</div>
+          <div class="stat"><b id="sAvg">–</b>Sterne im Schnitt</div>
+          <div class="stat"><b id="sCount">0</b>Feedbacks</div>
+        </div>
+        <p>
+          <button id="reload">Neu laden</button>
+          <button id="csv">Als CSV herunterladen</button>
+          <button id="logout">Abmelden</button>
+        </p>
+      </div>
+    </div>
+    <div class="win">
+      <h2>FEEDBACK</h2>
+      <div class="body scroll">
+        <table>
+          <thead><tr><th>Datum</th><th>Sterne</th><th>Text</th><th>Spielzeit</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="empty" class="hidden">Noch kein Feedback.</p>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+'use strict';
+let pw = sessionStorage.getItem('klammiAdmin') || '';
+let data = null;
+const $ = id => document.getElementById(id);
+const call = (url, method) => fetch(url, { method: method || 'GET', headers: { Authorization: 'Bearer ' + pw } });
+
+async function load() {
+  $('msg').textContent = '';
+  let res;
+  try { res = await call('/api/admin/data'); } catch (e) { $('msg').textContent = 'Server nicht erreichbar.'; return; }
+  if (!res.ok) {
+    let err = '';
+    try { err = (await res.json()).error; } catch (e) { /* egal */ }
+    sessionStorage.removeItem('klammiAdmin');
+    $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+    $('msg').textContent = err || 'Anmeldung fehlgeschlagen.';
+    return;
+  }
+  data = await res.json();
+  sessionStorage.setItem('klammiAdmin', pw);
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  render();
+}
+
+function render() {
+  const s = data.stats, fb = data.feedback.slice().reverse();
+  $('sStarts').textContent = s.starts;
+  $('sFinishes').textContent = s.finishes;
+  $('sRate').textContent = s.starts ? Math.round(s.finishes / s.starts * 100) + ' %' : '–';
+  $('sAvg').textContent = fb.length ? (fb.reduce((a, f) => a + f.stars, 0) / fb.length).toFixed(1) : '–';
+  $('sCount').textContent = fb.length;
+  const rows = $('rows');
+  rows.textContent = '';
+  $('empty').classList.toggle('hidden', fb.length > 0);
+  for (const f of fb) {
+    const tr = document.createElement('tr');
+    const cell = (text, cls) => { const td = document.createElement('td'); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; };
+    cell(new Date(f.time).toLocaleString('de-DE'));
+    cell('★'.repeat(f.stars) + '☆'.repeat(5 - f.stars), 'stars');
+    cell(f.text, 'text');
+    cell(Math.floor(f.playTime / 60) + ':' + String(f.playTime % 60).padStart(2, '0'));
+    const td = cell('');
+    const b = document.createElement('button');
+    b.textContent = 'Löschen'; b.className = 'del';
+    b.onclick = async () => {
+      if (!confirm('Dieses Feedback wirklich löschen?')) return;
+      await call('/api/admin/feedback/' + f.id, 'DELETE');
+      load();
+    };
+    td.appendChild(b);
+    rows.appendChild(tr);
+  }
+}
+
+$('form').onsubmit = e => { e.preventDefault(); pw = $('pw').value; load(); };
+$('reload').onclick = load;
+$('logout').onclick = () => { pw = ''; sessionStorage.removeItem('klammiAdmin'); location.reload(); };
+$('csv').onclick = () => {
+  // Führendes Hochkomma verhindert, dass Tabellenprogramme Text als Formel ausführen.
+  const safe = t => '"' + String(t).replace(/^([=+\-@\t])/, "'$1").replace(/"/g, '""') + '"';
+  const lines = ['Datum;Sterne;Text;Spielzeit (Sek.)'].concat(data.feedback.map(f => [safe(f.time), f.stars, safe(f.text), f.playTime].join(';')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
+  a.download = 'klammi-feedback.csv';
+  a.click();
+};
+if (pw) load();
+</script>
+</body>
+</html>

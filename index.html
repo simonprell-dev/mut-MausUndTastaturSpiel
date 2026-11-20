@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KLAMMI.exe – Chaos im System</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas {
+    display: block; cursor: none;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="640" height="360"></canvas>
+<script src="js/engine.js"></script>
+<script src="js/art.js"></script>
+<script src="js/scenes1.js"></script>
+<script src="js/scenes2.js"></script>
+<script src="js/scenes3.js"></script>
+<script>G.init();</script>
+</body>
+</html>
