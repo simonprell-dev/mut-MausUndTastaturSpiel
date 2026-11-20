@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#272D48">
 <title>KLAMMI.exe – Admin</title>
 <style>
   :root { --bg: #17191C; --win: #DEDBD0; --title: #272D48; --text: #151515; --green: #A8F18D; --orange: #F8A945; --dark: #BD6B29; --shade: #8E8B82; }
@@ -27,6 +31,11 @@
   .scroll { overflow-x: auto; }
   #msg { color: var(--dark); margin-top: 8px; min-height: 1.4em; }
   .hidden { display: none; }
+  .warn { background: var(--dark); color: #fff; border: 2px solid #fff; padding: 10px 14px; margin-bottom: 20px; }
+  .bar { display: grid; grid-template-columns: 11em 1fr 3.5em; gap: 8px; align-items: center; margin: 4px 0; }
+  .bar .track { background: #fff; border: 2px solid var(--text); height: 18px; }
+  .bar .fill { background: var(--green); height: 100%; }
+  .bar .n { text-align: right; }
   .del { padding: 2px 8px; }
 </style>
 </head>
@@ -45,6 +54,7 @@
   </div>
 
   <div id="app" class="hidden">
+    <div id="storageWarn" class="warn hidden">Achtung: Auf Railway ist kein Volume angehängt. Feedback und Zähler gehen beim nächsten Deploy verloren. Volume am Service anlegen, dann bleibt alles erhalten.</div>
     <div class="win">
       <h2>ÜBERSICHT</h2>
       <div class="body">
@@ -60,6 +70,23 @@
           <button id="csv">Als CSV herunterladen</button>
           <button id="logout">Abmelden</button>
         </p>
+      </div>
+    </div>
+    <div class="win">
+      <h2>WIE WEIT KOMMEN DIE SPIELER?</h2>
+      <div class="body">
+        <p>So oft wurde jedes Level erreicht. Wo der Balken stark abfällt, steigen viele aus.</p>
+        <div id="funnel"></div>
+      </div>
+    </div>
+    <div class="win">
+      <h2>NUTZUNG PRO TAG</h2>
+      <div class="body scroll">
+        <table>
+          <thead><tr><th>Tag</th><th>Gestartet</th><th>Beendet</th><th>Feedbacks</th></tr></thead>
+          <tbody id="days"></tbody>
+        </table>
+        <p id="noDays" class="hidden">Noch keine Tagesdaten.</p>
       </div>
     </div>
     <div class="win">
@@ -106,6 +133,31 @@ function render() {
   $('sRate').textContent = s.starts ? Math.round(s.finishes / s.starts * 100) + ' %' : '–';
   $('sAvg').textContent = fb.length ? (fb.reduce((a, f) => a + f.stars, 0) / fb.length).toFixed(1) : '–';
   $('sCount').textContent = fb.length;
+  $('storageWarn').classList.toggle('hidden', !data.storage || data.storage.persistent);
+  // Level-Trichter
+  const NAMES = { l1: 'Cursorjagd', l2: 'Doppelklick', lf: 'Fenster', l3: 'Datei-Chaos', lw: 'Mausrad', lr: 'Rechtsklick', l4: 'Buchstabensalat', ls: 'Speichern', l5: 'Roboter', l6: 'Fehlermeldungen', l7: 'Virus', end: 'Urkunde (Ende)' };
+  const funnel = $('funnel');
+  funnel.textContent = '';
+  const lv = s.levels || {}, order = data.levelOrder || Object.keys(NAMES);
+  const top = Math.max(1, ...order.map(k => lv[k] || 0));
+  for (const k of order) {
+    const row = document.createElement('div'); row.className = 'bar';
+    const name = document.createElement('span'); name.textContent = NAMES[k] || k;
+    const track = document.createElement('div'); track.className = 'track';
+    const fill = document.createElement('div'); fill.className = 'fill'; fill.style.width = ((lv[k] || 0) / top * 100) + '%';
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = lv[k] || 0;
+    track.appendChild(fill); row.append(name, track, n); funnel.appendChild(row);
+  }
+  // Tage, neueste zuerst
+  const days = $('days');
+  days.textContent = '';
+  const keys = Object.keys(s.days || {}).sort().reverse().slice(0, 30);
+  $('noDays').classList.toggle('hidden', keys.length > 0);
+  for (const k of keys) {
+    const d = s.days[k], tr = document.createElement('tr');
+    for (const v of [k.split('-').reverse().join('.'), d.starts, d.finishes, d.feedback]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    days.appendChild(tr);
+  }
   const rows = $('rows');
   rows.textContent = '';
   $('empty').classList.toggle('hidden', fb.length > 0);

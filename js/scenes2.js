@@ -201,6 +201,7 @@ G.scenes.l5 = () => ({
   },
   update(dt) {
     const r = this.r;
+    this.hopT = Math.max(0, (this.hopT || 0) - dt);
     if (this.phase === 'intro') this.physics(dt, false);
     else if (this.phase === 'play') {
       if (G.keysPressed.includes('ArrowUp') && !this.upSaid) {
@@ -226,6 +227,19 @@ G.scenes.l5 = () => ({
           await G.tween(this, { chipY: 1 }, 0.7);
           this.installed = true; A.sfx('fanfare'); G.confetti(906 - this.cam + this.win.x, 170, 24);
           await K.say('Chip eingebaut! Der Roboter bekommt eine Gehaltserhöhung. Also: einen Keks.', { mood: 'victory' });
+          // Der Keks fällt vom Himmel, der Roboter dreht sich um und futtert ihn in drei Bissen.
+          const r = this.r;
+          r.face = -1;
+          this.cookie = { x: r.x - 9, y: -20, bites: 0 };
+          await G.tween(this.cookie, { y: r.y + 6 }, 0.8, 'bounce');
+          for (let i = 0; i < 3; i++) {
+            await G.wait(0.45);
+            this.cookie.bites++; this.hopT = 0.25; A.sfx('click');
+            G.confetti(this.win.x + 1 + this.cookie.x - this.cam, this.win.y + 14 + this.cookie.y, 4);
+          }
+          await G.wait(0.45);
+          this.cookie = null; this.hopT = 0.5; A.sfx('ok'); r.face = 1;
+          await K.say('Mampf! Er sagt Danke. Glaube ich. Er hat den Mund voll.', { mood: 'happy' });
           G.next();
         });
       }
@@ -254,7 +268,17 @@ G.scenes.l5 = () => ({
     G.rect(ctx, ox + 896, oy + 166, 22, 2, Math.floor(G.t * 3) % 2 || this.installed ? C.green : C.shade);
     G.text(ctx, 'ZIEL', ox + 907, oy + 126, C.green, 1, 'center');
     const carried = this.phase !== 'done';
-    Icons.robot(ctx, ox + r.x, oy + r.y, r.face, Math.abs(r.vx) > 1 && r.ground, carried);
+    const hop = this.hopT > 0 ? Math.round(Math.abs(Math.sin(this.hopT * 25)) * 5) : 0;
+    Icons.robot(ctx, ox + r.x, oy + r.y - hop, r.face, Math.abs(r.vx) > 1 && r.ground, carried);
+    const ck = this.cookie;
+    if (ck) {
+      const cx = Math.round(ox + ck.x), cy = Math.round(oy + ck.y);
+      G.disc(ctx, cx, cy, 6, C.text); G.disc(ctx, cx, cy, 5, C.orange);
+      G.rect(ctx, cx - 3, cy - 2, 2, 2, '#6E3D14'); G.rect(ctx, cx + 1, cy - 3, 2, 2, '#6E3D14'); G.rect(ctx, cx - 1, cy + 2, 2, 2, '#6E3D14');
+      // Bisse: von der Roboterseite her fehlt immer mehr
+      const bites = [[5, -3, 3], [4, 3, 4], [-1, 0, 5]];
+      for (let i = 0; i < ck.bites; i++) G.disc(ctx, cx + bites[i][0], cy + bites[i][1], bites[i][2], C.title);
+    }
     if (!carried && !this.installed) Icons.draw(ctx, 'chip', ox + r.x + 6 + (907 - r.x - 6) * this.chipY, oy + r.y - 11 + (154 - r.y + 11) * this.chipY);
     ctx.restore();
     if (this.phase === 'code') {
@@ -391,11 +415,11 @@ G.scenes.lr = () => ({
   phase: 'intro', info: '', step: 0, menu: null, leftT: -99, saidMenu: false, awake: false, cheese: true,
   steps: [
     { x: 210, y: 130, opts: ['Zudecken', 'Aufwecken', 'Kitzeln'], ok: 1, info: 'Rechtsklick auf den schlafenden Ordner',
-      wrong: ['Jetzt schläft er noch tiefer. Na toll.', '', 'Er kichert im Schlaf. Aber wach ist er nicht.'] },
+      wrong: [V('Jetzt schläft er noch tiefer. Na toll.'), '', V('Er kichert im Schlaf. Aber wach ist er nicht.')] },
     { x: 410, y: 140, opts: ['Öffnen', 'Umbenennen', 'Löschen'], ok: 2, info: 'Rechtsklick auf den stinkenden Käse',
-      wrong: ['Puh! Schnell wieder zumachen!', 'Jetzt heißt er Parfüm. Er stinkt trotzdem.', ''] },
+      wrong: [V('Puh! Schnell wieder zumachen!'), V('Jetzt heißt er Parfüm. Er stinkt trotzdem.'), ''] },
     { x: 604, y: 306, opts: ['Auslachen', 'Noch mehr verknoten', 'Entknoten'], ok: 2, info: 'Rechtsklick auf Klammi',
-      wrong: ['Sehr witzig. Wirklich.', 'Aua! Andere Richtung!', ''] }
+      wrong: [V('Sehr witzig. Wirklich.'), V('Aua! Andere Richtung!'), ''] }
   ],
   enter() {
     K.home();
@@ -444,7 +468,6 @@ G.scenes.lr = () => ({
         await K.say('Weg ist er! Rechtsklick ist toll! Ich tanze vor Freu…', { mood: 'happy' });
         K.pose('tangled'); A.sfx('bad');
         await K.say('Ähm. Ich habe mich verknotet. Rechtsklick auf mich, bitte!');
-        K.pose('tangled');
       } else {
         A.sfx('fanfare');
         await K.say('Aaah. Viel besser! Rechts öffnet das Menü, links wählt aus. Merken!', { mood: 'victory' });

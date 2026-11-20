@@ -55,8 +55,8 @@ G.scenes.l6 = () => ({
       if (!this.fooled) { this.fooled = true; K.say('Reingefallen! Diesmal war Abbrechen falsch. Immer erst lesen!', { block: false, mood: 'shocked' }); }
       return;
     }
-    const lines = ['Halt! Hast du gelesen, was da steht?', 'Wiederholen wiederholt den FEHLER! Nicht die Rettung!',
-      'Vier neue Meldungen! Jedes Mal vier!', 'LIES! DEN! TEXT!', 'Ich sehe den Desktop nicht mehr! Abbrechen! ABBRECHEN!'];
+    const lines = [V('Halt! Hast du gelesen, was da steht?'), V('Wiederholen wiederholt den FEHLER! Nicht die Rettung!'),
+      V('Vier neue Meldungen! Jedes Mal vier!'), V('LIES! DEN! TEXT!'), V('Ich sehe den Desktop nicht mehr! Abbrechen! ABBRECHEN!')];
     K.say(lines[Math.min(this.retries - 1, 2 + (this.retries % 3))], { block: false });
   },
   update(dt) {
@@ -181,7 +181,7 @@ G.scenes.l7 = () => ({
       if (m.pressed) {
         if (G.dist(m, v) < v.r + 8) {
           this.hp--; v.hurt = 0.5; v.r -= 5; v.vx *= 1.2; v.vy *= 1.2; A.sfx('hit'); G.shake = 3; G.progress();
-          if (this.hp > 0) this.vsay(this.hp === 2 ? 'Aua! Das kitzelt!' : 'He! Nicht so fest!', { block: false });
+          if (this.hp > 0) this.vsay(this.hp === 2 ? VV('Aua! Das kitzelt!') : VV('He! Nicht so fest!'), { block: false });
           else {
             this.phase = 'B'; this.info = 'Ziehe den Virus in den Papierkorb'; v.r = 11;
             K.say('Er ist ganz benommen! Zieh ihn in den Papierkorb! Festhalten und ziehen!', { block: false, mood: 'happy' });
@@ -319,7 +319,7 @@ G.scenes.end = () => ({
         else if (k === 'Enter') {
           this.name = this.typed.trim() || 'Computerprofi';
           this.phase = 'cert'; A.sfx('fanfare'); G.confetti(320, 120, 60); G.progress();
-          K.say(this.name + ', du bist jetzt offiziell Computer-Retter! Ich bin fast ein bisschen stolz.', { block: false, mood: 'victory', dy: 46 });
+          K.say(this.name + ', du bist jetzt offiziell Computer-Retter! Ich bin fast ein bisschen stolz.', { block: false, mood: 'victory', dy: 46, voice: V('Du bist jetzt offiziell Computer-Retter! Ich bin fast ein bisschen stolz.') });
           break;
         } else if (k.length === 1 && FONT[k] && this.typed.length < 14) { this.typed += k; A.sfx('type'); G.progress(); }
       }

@@ -16,7 +16,7 @@ G.scenes.title = () => ({
   },
   update() {
     if (G.clicked(this.btn)) {
-      A.init(); G.fullscreen(); A.sfx('ok'); G.track('start');
+      A.init(); G.fullscreen(); A.sfx('ok'); G.track('start'); Voice.warm();
       K.scale = 1;
       const h = (typeof location !== 'undefined' && location.hash || '').slice(1);
       G.go(G.scenes[h] ? h : 'boot');
@@ -28,8 +28,6 @@ G.scenes.title = () => ({
     this.lines.forEach((l, i) => G.text(ctx, l, 200, 118 + i * 11, C.win));
     G.button(ctx, this.btn, 'Spiel starten', { color: C.orange });
     G.text(ctx, 'Mit Ton! Du brauchst Maus und Tastatur.', 200, 272, C.shade);
-    G.rect(ctx, 0, 322, 640, 1, C.dot);
-    G.text(ctx, 'Ein Lernspiel von ' + G.AUTHOR, 320, 334, C.green, 1, 'center');
   },
   hint() { return { type: 'click', x: this.btn.x + 85, y: this.btn.y + 15 }; }
 });
@@ -407,8 +405,12 @@ G.scenes.l3 = () => ({
           G.tween(it, { x: d.sx, y: d.sy }, 0.6, 'elastic').then(() => { it.busy = false; });
           if (G.t - this.wrongT > 5) {
             this.wrongT = G.t;
-            const what = { banana: 'Eine Banane', sock: 'Eine Socke', note: 'Musik', pic: 'Ein Bild' }[it.k];
-            K.say(what + ' gehört da nicht rein. Glaub mir, ich hab es selbst ausprobiert.', { block: false });
+            K.say({
+              banana: V('Eine Banane gehört da nicht rein. Glaub mir, ich hab es selbst ausprobiert.'),
+              sock: V('Eine Socke gehört da nicht rein. Glaub mir, ich hab es selbst ausprobiert.'),
+              note: V('Musik gehört da nicht rein. Glaub mir, ich hab es selbst ausprobiert.'),
+              pic: V('Ein Bild gehört da nicht rein. Glaub mir, ich hab es selbst ausprobiert.')
+            }[it.k], { block: false });
           }
         } else if (moved < 5 && G.t - d.t < 0.4 && ++this.taps % 2 === 0) {
           K.say('Nicht nur klicken! Gedrückt halten und ziehen.', { block: false });
@@ -481,7 +483,7 @@ G.scenes.lf = () => ({
     if (p === 'min' || p === 'max' || p === 'shrink') {
       const want = p === 'min' ? 0 : 1;
       if (hit(2)) return this.wrong('Nicht das Kreuz! Dann ist das Fenster ganz zu. Wir brauchen es noch.');
-      if (hit(1 - want)) return this.wrong(want === 0 ? 'Das macht es noch größer! Hilfe! Nimm den Strich.' : 'Nicht verstecken! Nimm das Kästchen in der Mitte.');
+      if (hit(1 - want)) return this.wrong(want === 0 ? V('Das macht es noch größer! Hilfe! Nimm den Strich.') : V('Nicht verstecken! Nimm das Kästchen in der Mitte.'));
       if (!hit(want)) return;
       A.sfx('pop'); G.progress(); this.phase = 'wait'; this.info = '';
       G.script(async () => {

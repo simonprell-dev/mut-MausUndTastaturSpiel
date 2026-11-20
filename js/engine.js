@@ -290,7 +290,10 @@ G.go = function (name) {
   K.reset();
   A.music = null;
   G.sceneName = name;
+  const links = document.getElementById('links');
+  if (links && links.style) links.style.display = name === 'title' ? 'flex' : 'none';
   G.level = Math.max(0, G.ORDER.indexOf(name) - 1);
+  if (G.level > 0) G.track('level', name); // anonymer Zähler: wie weit kommen die Spieler?
   G.scene = G.scenes[name]();
   G.progressT = G.t;
   if (G.scene.enter) G.scene.enter();
@@ -360,41 +363,72 @@ const A = {
 };
 
 // ---------------------------------------------------------------- Sprachausgabe
+// Klammis Stimme besteht aus fertigen Aufnahmen im Ordner audio/. Dadurch klingt sie auf jedem
+// Gerät gleich. Erzeugt werden sie mit tools/make-voice.py (Sprachmodell Piper); dabei entsteht
+// auch js/voice-lines.js mit der Zuordnung Text -> Datei.
+const V = s => s;   // markiert einen Klammi-Text für den Generator
+const VV = s => s;  // markiert einen Virus-Text für den Generator
 const Voice = {
-  voice: null,
-  ok() { return typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined'; },
-  pick() {
-    try {
-      const vs = speechSynthesis.getVoices();
-      this.count = vs.length;
-      const de = vs.filter(v => /^de/i.test(v.lang));
-      this.voice = de.find(v => /natural|online|google/i.test(v.name)) || de[0] || null;
-    } catch (e) { this.voice = null; }
+  seq: 0, src: null, tag: null, cache: {},
+  file(text, who) { return typeof VOICE_LINES !== 'undefined' ? VOICE_LINES[(who === 'virus' ? 'v|' : 'k|') + text] : null; },
+  load(url) {
+    if (!this.cache[url]) {
+      this.cache[url] = fetch(url)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+        .then(buf => new Promise((res, rej) => A.ac.decodeAudioData(buf, res, rej)));
+      this.cache[url].catch(() => { delete this.cache[url]; });
+    }
+    return this.cache[url];
   },
-  // Gibt true zurück, wenn wirklich gesprochen wird.
-  speak(text, pitch, onend) {
-    if (G.muted || !this.ok()) return false;
-    try {
-      speechSynthesis.cancel();
-      if (!this.voice) this.pick();
-      if (!this.voice && this.count > 0) return false; // keine deutsche Stimme installiert
-      const spoken = text.replace(/[A-ZÄÖÜ]{3,}/g, w => w[0] + w.slice(1).toLowerCase()).replace(/[„“”]/g, '');
-      const u = new SpeechSynthesisUtterance(spoken);
-      u.lang = 'de-DE';
-      if (this.voice) u.voice = this.voice;
-      u.pitch = pitch; u.rate = 1.08;
-      let done = false;
-      u.onend = u.onerror = () => { if (!done) { done = true; onend(); } };
-      this.keep = u; // verhindert vorzeitiges Aufräumen in Chrome
-      speechSynthesis.speak(u);
-      return true;
-    } catch (e) { return false; }
+  // Lädt nach dem Start alle Aufnahmen im Hintergrund, damit Klammi ohne Verzögerung spricht.
+  warm() {
+    if (typeof VOICE_LINES === 'undefined' || !A.ac || !G.online()) return;
+    const urls = Object.values(VOICE_LINES).map(f => 'audio/' + f);
+    const next = () => { const u = urls.shift(); if (u) this.load(u).then(next, next); };
+    next(); next();
   },
-  stop() { if (this.ok()) { try { speechSynthesis.cancel(); } catch (e) { /* egal */ } } }
+  // Spielt die Aufnahme zu einem Text. Gibt true zurück, wenn es eine gibt. onend(failed) meldet das Ende.
+  speak(text, who, onend) {
+    if (G.muted) return false;
+    const f = this.file(text, who);
+    if (!f) return false;
+    this.stop();
+    const id = ++this.seq, url = 'audio/' + f;
+    const fail = () => { if (id === this.seq) onend(true); };
+    const viaTag = () => {
+      if (id !== this.seq) return;
+      if (typeof Audio === 'undefined') return fail();
+      try {
+        const a = new Audio(url);
+        this.tag = a;
+        a.onended = () => { if (id === this.seq) onend(false); };
+        a.onerror = fail;
+        const p = a.play();
+        if (p && p.catch) p.catch(fail);
+      } catch (e) { fail(); }
+    };
+    if (A.ac && G.online()) {
+      this.load(url).then(buf => {
+        if (id !== this.seq || G.muted) return;
+        const src = A.ac.createBufferSource(), g = A.ac.createGain();
+        src.buffer = buf; g.gain.value = 0.9;
+        src.connect(g); g.connect(A.ac.destination);
+        src.onended = () => { if (id === this.seq) onend(false); };
+        this.src = src;
+        src.start();
+      }).catch(viaTag);
+    } else viaTag();
+    return true;
+  },
+  stop() {
+    this.seq++;
+    if (this.src) { try { this.src.onended = null; this.src.stop(); } catch (e) { /* egal */ } this.src = null; }
+    if (this.tag) { try { this.tag.onended = null; this.tag.pause(); } catch (e) { /* egal */ } this.tag = null; }
+  }
 };
 
 // ---------------------------------------------------------------- Urheber, Teilen, Server
-G.AUTHOR = 'PrellDynamics';
+G.AUTHOR = (typeof SITE !== 'undefined' && SITE.author) || 'PrellDynamics';
 G.online = () => typeof location !== 'undefined' && /^https?:/.test(location.protocol) && typeof fetch !== 'undefined';
 // Schickt etwas an den eigenen Server. Ohne Server (Datei lokal geöffnet) passiert nichts.
 G.post = function (url, data) {
@@ -402,7 +436,7 @@ G.post = function (url, data) {
   return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
 };
-G.track = function (type) { G.post('/api/event', { type }).catch(() => {}); };
+G.track = function (type, level) { G.post('/api/event', { type, level }).catch(() => {}); };
 // Teilen: Teilen-Dialog des Geräts, sonst Link in die Zwischenablage. Liefert einen Hinweistext.
 G.share = function () {
   if (typeof location === 'undefined' || typeof navigator === 'undefined') return Promise.resolve('');
@@ -477,7 +511,6 @@ G.init = function () {
   });
   window.addEventListener('keyup', e => { G.held[e.key] = false; });
   window.addEventListener('blur', () => { G.held = {}; G.mouse.down = false; G.mouse.rdown = false; });
-  if (Voice.ok()) { Voice.pick(); try { speechSynthesis.onvoiceschanged = () => Voice.pick(); } catch (e) { /* egal */ } }
 
   G.go('title');
   let last = 0;

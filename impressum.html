@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#272D48">
+<title>Impressum &amp; Datenschutz – KLAMMI.exe</title>
+<style>
+  :root { --bg: #17191C; --win: #DEDBD0; --title: #272D48; --text: #151515; --green: #A8F18D; --dark: #BD6B29; --shade: #8E8B82; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 "Courier New", monospace; padding: 16px; }
+  main { max-width: 760px; margin: 0 auto; }
+  .win { background: var(--win); border: 2px solid var(--text); box-shadow: 6px 6px 0 rgba(0,0,0,.4); margin-bottom: 22px; }
+  .win > h1, .win > h2 { margin: 0; padding: 7px 12px; background: var(--title); color: #fff; font-size: 16px; letter-spacing: 1px; }
+  .body { padding: 6px 16px 14px; }
+  h3 { margin: 18px 0 4px; font-size: 16px; }
+  p, ul { margin: 6px 0; }
+  a { color: var(--title); }
+  .back { display: inline-block; margin-bottom: 16px; color: var(--green); }
+  .missing { background: var(--dark); color: #fff; padding: 0 6px; }
+  #warn { background: var(--dark); color: #fff; padding: 10px 14px; margin-bottom: 20px; border: 2px solid #fff; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">← Zurück zum Spiel</a>
+  <div id="warn" class="hidden">Achtung: In js/config.js fehlen noch Pflichtangaben. Die markierten Stellen müssen vor der Veröffentlichung ausgefüllt werden.</div>
+
+  <div class="win">
+    <h1>IMPRESSUM</h1>
+    <div class="body">
+      <h3>Angaben gemäß § 5 DDG</h3>
+      <p>
+        <span data-f="owner"></span><br>
+        <span data-f="street"></span><br>
+        <span data-f="city"></span><br>
+        <span data-f="country" data-optional></span>
+      </p>
+      <h3>Kontakt</h3>
+      <p>
+        E-Mail: <span data-f="email"></span>
+        <span id="phoneRow"><br>Telefon: <span data-f="phone" data-optional></span></span>
+      </p>
+      <p id="vatRow">Umsatzsteuer-ID: <span data-f="vatId" data-optional></span></p>
+      <p id="urlRow">Web: <a id="url" rel="noopener"></a></p>
+      <h3>Verantwortlich für den Inhalt (§ 18 Abs. 2 MStV)</h3>
+      <p><span data-f="responsible"></span>, Anschrift wie oben</p>
+      <h3>Verbraucherstreitbeilegung</h3>
+      <p>Ich bin nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+    </div>
+  </div>
+
+  <div class="win">
+    <h2>DATENSCHUTZ</h2>
+    <div class="body">
+      <h3>Kurz gesagt</h3>
+      <p>KLAMMI.exe ist ein Lernspiel für Kinder. Es gibt keine Anmeldung, keine Werbung, keine Cookies und keine Analyse-Dienste von Dritten.</p>
+
+      <h3>Verantwortlich</h3>
+      <p><span data-f="owner"></span>, Kontakt siehe Impressum.</p>
+
+      <h3>Was beim Spielen gespeichert wird</h3>
+      <ul>
+        <li><b>Zähler:</b> Der Server zählt, wie oft das Spiel gestartet und beendet wurde. Das sind reine Zahlen ohne Bezug zu einer Person.</li>
+        <li><b>Feedback (freiwillig):</b> Wer am Ende Feedback abschickt, übermittelt die Sterne-Bewertung, den optionalen Text, die Spielzeit und den Zeitpunkt. Der Name auf der Urkunde wird nicht übertragen und nicht gespeichert.</li>
+        <li><b>Name auf der Urkunde:</b> Bleibt nur im Browser und ist nach dem Schließen der Seite weg.</li>
+      </ul>
+
+      <h3>IP-Adresse</h3>
+      <p>Beim Aufruf der Seite wird technisch bedingt die IP-Adresse übertragen. Der Spielserver nutzt sie nur kurzzeitig im Arbeitsspeicher, um Missbrauch zu begrenzen (höchstens eine Minute), und speichert sie nicht. Der Hosting-Anbieter kann eigene Zugriffsprotokolle führen.</p>
+
+      <h3>Hosting</h3>
+      <p>Das Spiel wird bei Railway (Railway Corporation, USA) betrieben. Dabei können Daten auf Servern außerhalb der EU verarbeitet werden.</p>
+
+      <h3>Sprachausgabe</h3>
+      <p>Klammis Stimme besteht aus fertigen Aufnahmen, die vom Spielserver geladen werden. Es wird kein Sprachdienst eines anderen Anbieters verwendet. Mit dem Lautsprecher-Knopf im Spiel lässt sich der Ton abschalten. Erzeugt wurden die Aufnahmen mit dem freien Sprachmodell Piper und der Stimme „Thorsten“ (Thorsten-Voice von Thorsten Müller).</p>
+
+      <h3>Rechtsgrundlage</h3>
+      <p>Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (Betrieb und Verbesserung des Spiels), beim Feedback auf Grundlage der freiwilligen Abgabe.</p>
+
+      <h3>Deine Rechte</h3>
+      <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Widerspruch sowie das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren. Wenn ein Feedback gelöscht werden soll, genügt eine Nachricht an die oben genannte E-Mail-Adresse mit Datum und Text des Feedbacks.</p>
+    </div>
+  </div>
+</main>
+<script src="js/config.js"></script>
+<script>
+'use strict';
+let missing = false;
+for (const el of document.querySelectorAll('[data-f]')) {
+  const v = (SITE[el.dataset.f] || '').trim();
+  if (v) el.textContent = v;
+  else if (!('optional' in el.dataset)) { el.textContent = 'fehlt noch'; el.className = 'missing'; missing = true; }
+}
+if (!SITE.phone) document.getElementById('phoneRow').classList.add('hidden');
+if (!SITE.vatId) document.getElementById('vatRow').classList.add('hidden');
+const url = document.getElementById('url');
+if (/^https?:\/\//.test(SITE.url)) { url.href = SITE.url; url.textContent = SITE.url; }
+else document.getElementById('urlRow').classList.add('hidden');
+if (missing) document.getElementById('warn').classList.remove('hidden');
+</script>
+</body>
+</html>

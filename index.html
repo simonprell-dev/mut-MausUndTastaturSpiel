@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="KLAMMI.exe – ein Retro-Lernspiel, in dem Kinder Maus und Tastatur kennenlernen.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#272D48">
 <title>KLAMMI.exe – Chaos im System</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
@@ -11,15 +16,37 @@
     display: block; cursor: none;
     image-rendering: pixelated; image-rendering: crisp-edges;
   }
+  /* Echte Links, nur auf der Startseite sichtbar */
+  #links {
+    position: fixed; left: 0; right: 0; bottom: 3vh;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4em 1.6em;
+    font: bold clamp(11px, 2.1vh, 22px)/1.2 "Courier New", monospace;
+    color: #A8F18D; cursor: none;
+  }
+  #links a { color: #A8F18D; cursor: none; }
+  #links a:hover, #links a:focus { color: #F8A945; }
 </style>
 </head>
 <body>
 <canvas id="game" width="640" height="360"></canvas>
+<nav id="links">
+  <span>Ein Lernspiel von <a id="authorLink" target="_blank" rel="noopener"></a></span>
+  <a href="impressum.html">Impressum &amp; Datenschutz</a>
+</nav>
+<script src="js/config.js"></script>
+<script src="js/voice-lines.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/art.js"></script>
 <script src="js/scenes1.js"></script>
 <script src="js/scenes2.js"></script>
 <script src="js/scenes3.js"></script>
-<script>G.init();</script>
+<script>
+  (function () {
+    const a = document.getElementById('authorLink');
+    a.textContent = SITE.author;
+    if (/^https?:\/\//.test(SITE.url)) a.href = SITE.url;
+  })();
+  G.init();
+</script>
 </body>
 </html>

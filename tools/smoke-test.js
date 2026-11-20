@@ -13,8 +13,20 @@ global.addEventListener = noop;
 global.innerWidth = 1280; global.innerHeight = 720; global.devicePixelRatio = 1;
 global.requestAnimationFrame = noop;
 
-for (const f of ['engine', 'art', 'scenes1', 'scenes2', 'scenes3'])
+for (const f of ['voice-lines', 'engine', 'art', 'scenes1', 'scenes2', 'scenes3'])
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), { filename: f + '.js' });
+
+// Jede gesprochene Zeile braucht eine Aufnahme in audio/ (sonst: python tools/make-voice.py)
+global.missingVoice = [];
+vm.runInThisContext(`{
+  const file = Voice.file.bind(Voice);
+  Voice.speak = (text, who) => {
+    const f = file(text, who);
+    if (!f || !require('fs').existsSync(require('path').join(${JSON.stringify(path.join(__dirname, '..', 'audio'))}, f))) missingVoice.push(text);
+    return false;
+  };
+}`);
+global.require = require;
 
 const run = vm.runInThisContext(`(async function (opts) {
   const tick = () => new Promise(r => setImmediate(r));
@@ -29,7 +41,7 @@ const run = vm.runInThisContext(`(async function (opts) {
     if (G.sceneName !== last) { last = G.sceneName; console.log('  ' + (G.t.toFixed(1) + 's').padStart(8) + '  -> ' + last); }
     if (G.sceneName === 'end' && G.scene.phase === 'cert') {
       console.error = origErr;
-      return { ok: errors === 0, time: G.t, errors, maxOpen };
+      return { ok: errors === 0 && missingVoice.length === 0, time: G.t, errors, maxOpen, missingVoice };
     }
     // Eingaben des Bots
     if (m.down && !drag) { m.down = false; m.released = true; }

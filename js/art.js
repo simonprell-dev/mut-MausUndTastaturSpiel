@@ -178,9 +178,11 @@ const K = {
         text, shown: 0, t: 0, block: o.block !== false, resolve, who: o.who || 'k',
         x: o.x, y: o.y, dy: o.dy || 0, speechDone: false, born: G.frame, endT: null, mood: o.mood
       };
-      L.tts = Voice.speak(text, L.who === 'virus' ? 0.2 : 1.6, () => { L.speechDone = true; });
       L.minT = 0.8 + text.length * 0.03;
-      L.maxT = L.tts ? 4 + text.length * 0.11 : 1.2 + text.length * 0.06;
+      const silent = 1.2 + text.length * 0.06;
+      // failed = Aufnahme ließ sich nicht abspielen: dann läuft die Zeile wie ohne Ton weiter
+      L.tts = Voice.speak(norm(o.voice || text), L.who, failed => { if (failed) { L.tts = false; L.maxT = silent; } else L.speechDone = true; });
+      L.maxT = L.tts ? 5 + text.length * 0.13 : silent;
       L.lines = G.wrap(text, 236);
       this.line = L;
       if (o.mood) this.pose(o.mood);
@@ -221,13 +223,17 @@ const K = {
   },
   drawBody(ctx) {
     const s = this.scale, t = G.t, p = this.pose_;
-    let ox = 0, oy = Math.round(Math.sin(t * 3)), sx = 1, sy = 1, rot = 0, big = false;
+    let ox = 0, oy = Math.round(Math.sin(t * 3)), sx = 1, sy = 1, rot = 0, big = false, knot = false;
     if (p === 'happy') oy = -Math.round(Math.abs(Math.sin(t * 10)) * 8);
     else if (p === 'shocked') { sy = 1.12; big = true; oy = 0; }
     else if (p === 'panic') { ox = rint(-2, 2); oy = rint(-1, 1); big = true; }
     else if (p === 'thinking') rot = 0.22;
     else if (p === 'squashed') { sy = 0.45; sx = 1.35; oy = 0; }
-    else if (p === 'tangled') rot = Math.sin(t * 9) * 0.4;
+    else if (p === 'tangled') {
+      // erst wild herumwirbeln, dann als Knoten liegen bleiben und zappeln
+      const a = t - this.poseStart;
+      if (a < 0.5) rot = a / 0.5 * Math.PI * 4; else { knot = true; rot = Math.sin(t * 7) * 0.07; ox = Math.round(Math.sin(t * 13)); oy = 0; }
+    }
     else if (p === 'victory') {
       const a = t - this.poseStart;
       rot = a < 0.6 ? a / 0.6 * Math.PI * 2 : 0;
@@ -237,14 +243,35 @@ const K = {
     ctx.translate(Math.round(this.x + ox), Math.round(this.y + oy));
     if (rot) { ctx.translate(0, -25 * s); ctx.rotate(rot); ctx.translate(0, 25 * s); }
     ctx.scale(s * sx, s * sy);
-    const segs = [[-10, -50, 3, 38], [-10, -50, 20, 3], [7, -50, 3, 48], [-4, -3, 14, 3], [-4, -30, 3, 30], [-4, -30, 9, 3], [2, -30, 3, 14]];
-    ctx.fillStyle = C.text;
-    for (const [x, y, w, h] of segs) ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-    ctx.fillStyle = C.green;
-    for (const [x, y, w, h] of segs) ctx.fillRect(x, y, w, h);
+    if (knot) {
+      // Der Draht als Knoten: Jedes Stück wird einzeln mit Umriss gezeichnet,
+      // dadurch liegen spätere Stücke sichtbar ÜBER den früheren (drunter und drüber).
+      const k = [
+        [-13, -20, 3, 20], [-13, -20, 23, 3], [7, -41, 3, 24], [-11, -41, 21, 3], [-11, -41, 3, 15],
+        [-11, -29, 28, 3], [14, -29, 3, 22], [-4, -10, 21, 3], [-4, -35, 3, 28], [-4, -35, 8, 3], [1, -35, 3, 9]
+      ];
+      for (const [x, y, w, h] of k) {
+        ctx.fillStyle = C.text; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+        ctx.fillStyle = C.green; ctx.fillRect(x, y, w, h);
+      }
+      // Ecken wieder schließen: Dort, wo zwei Stücke aneinanderhängen, soll keine Lücke sein.
+      ctx.fillStyle = C.green;
+      for (let i = 0; i + 1 < k.length; i++) {
+        const a = k[i], b = k[i + 1];
+        const x0 = Math.max(a[0], b[0]), y0 = Math.max(a[1], b[1]);
+        const x1 = Math.min(a[0] + a[2], b[0] + b[2]), y1 = Math.min(a[1] + a[3], b[1] + b[3]);
+        if (x1 > x0 && y1 > y0) ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+    } else {
+      const segs = [[-10, -50, 3, 38], [-10, -50, 20, 3], [7, -50, 3, 48], [-4, -3, 14, 3], [-4, -30, 3, 30], [-4, -30, 9, 3], [2, -30, 3, 14]];
+      ctx.fillStyle = C.text;
+      for (const [x, y, w, h] of segs) ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+      ctx.fillStyle = C.green;
+      for (const [x, y, w, h] of segs) ctx.fillRect(x, y, w, h);
+    }
     // Augen
     const blink = (t % 3.7) < 0.12 && !big;
-    const ew = big ? 9 : 8, eh = big ? 11 : 9, ey = big ? -51 : -48;
+    const ew = big ? 9 : 8, eh = big ? 11 : 9, ey = big ? -51 : knot ? -53 : -48;
     const px = clamp(Math.round((G.mouse.x - this.x) / 70), -2, 2);
     const py = clamp(Math.round((G.mouse.y - (this.y - 44 * s)) / 70), -2, 2);
     for (const ex of [-11, 1]) {
@@ -253,10 +280,13 @@ const K = {
       ctx.fillRect(ex, ey, ew, eh);
       ctx.fillStyle = C.white; ctx.fillRect(ex + 1, ey + 1, ew - 2, eh - 2);
       ctx.fillStyle = C.text;
-      ctx.fillRect(ex + Math.floor((ew - 3) / 2) + (big ? 0 : px), ey + Math.floor((eh - 4) / 2) + (big ? 0 : py), 3, 4);
+      // verknotet: Klammi schielt
+      if (knot) ctx.fillRect(ex + (ex < 0 ? 4 : 1), ey + 3, 3, 4);
+      else ctx.fillRect(ex + Math.floor((ew - 3) / 2) + (big ? 0 : px), ey + Math.floor((eh - 4) / 2) + (big ? 0 : py), 3, 4);
     }
     // Mund
     const open = p === 'panic' || p === 'shocked' || (this.talking() && Math.floor(t * 9) % 2 === 0);
+    if (knot) ctx.translate(0, -8);
     ctx.fillStyle = C.text;
     if (open) { ctx.fillRect(-4, -37, 7, 6); ctx.fillStyle = C.red; ctx.fillRect(-3, -36, 5, 4); }
     else { ctx.fillRect(-4, -36, 7, 3); ctx.fillStyle = C.win; ctx.fillRect(-3, -35, 5, 1); }
