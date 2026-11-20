@@ -25,9 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 AUDIO = ROOT / "audio"
 
-# Klang je Figur: pitch = Tonhöhe (1.0 = unverändert), speed = Sprechtempo des Modells (kleiner = schneller)
+# Klang je Figur: pitch = Tonhöhe (1.0 = unverändert), speed = Sprechtempo des Modells (kleiner = schneller),
+# noise / noise_w = wie stark Betonung und Rhythmus schwanken (höher = lebhafter)
 FIGURES = {
-    "k": {"pitch": 1.22, "speed": 0.92},   # Klammi: etwas höher und flotter, wie eine Trickfigur
+    "k": {"pitch": 1.35, "speed": 0.84, "noise": 0.85, "noise_w": 1.0},   # Klammi: hoch, flott und lebhaft betont
     "v": {"pitch": 0.80, "speed": 1.05},   # Virus: tiefer und langsamer
 }
 VERSION = "1"  # hochzählen, um alle Aufnahmen neu zu erzeugen
@@ -106,7 +107,8 @@ def main():
         with tempfile.TemporaryDirectory() as tmp:
             wav = Path(tmp) / "line.wav"
             with wave.open(str(wav), "wb") as w:
-                voice.synthesize_wav(say, w, syn_config=SynthesisConfig(length_scale=fig["speed"]))
+                voice.synthesize_wav(say, w, syn_config=SynthesisConfig(
+                    length_scale=fig["speed"], noise_scale=fig.get("noise"), noise_w_scale=fig.get("noise_w")))
             p = fig["pitch"]
             # Tonhöhe ändern, Tempo beibehalten; Lautstärke angleichen; Stille am Rand kürzen
             flt = (f"asetrate={int(rate * p)},aresample=44100,atempo={1 / p:.4f},"
