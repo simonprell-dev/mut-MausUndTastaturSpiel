@@ -65,6 +65,7 @@
           <div class="stat"><b id="sAvg">–</b>Sterne im Schnitt</div>
           <div class="stat"><b id="sCount">0</b>Feedbacks</div>
         </div>
+        <p id="storageInfo"></p>
         <p>
           <button id="reload">Neu laden</button>
           <button id="csv">Als CSV herunterladen</button>
@@ -133,7 +134,12 @@ function render() {
   $('sRate').textContent = s.starts ? Math.round(s.finishes / s.starts * 100) + ' %' : '–';
   $('sAvg').textContent = fb.length ? (fb.reduce((a, f) => a + f.stars, 0) / fb.length).toFixed(1) : '–';
   $('sCount').textContent = fb.length;
-  $('storageWarn').classList.toggle('hidden', !data.storage || data.storage.persistent);
+  const st = data.storage || {};
+  $('storageWarn').classList.toggle('hidden', st.persistent !== false && !st.error);
+  if (st.error) $('storageWarn').textContent = 'Achtung: Speichern schlägt fehl (' + st.error + '). Neue Daten gehen verloren, bis das behoben ist.';
+  $('storageInfo').textContent = 'Speicher: ' +
+    (st.volume ? 'Railway-Volume' + (st.volumeName ? ' „' + st.volumeName + '“' : '') + ' unter ' + st.volume : st.onRailway ? 'kein Volume (flüchtig)' : 'lokaler Ordner') +
+    (st.savedAt ? ' – zuletzt gespeichert ' + new Date(st.savedAt).toLocaleString('de-DE') : ' – seit dem letzten Start noch nichts gespeichert');
   // Level-Trichter
   const NAMES = { l1: 'Cursorjagd', l2: 'Doppelklick', lf: 'Fenster', l3: 'Datei-Chaos', lw: 'Mausrad', lr: 'Rechtsklick', l4: 'Buchstabensalat', ls: 'Speichern', l5: 'Roboter', l6: 'Fehlermeldungen', l7: 'Virus', end: 'Urkunde (Ende)' };
   const funnel = $('funnel');

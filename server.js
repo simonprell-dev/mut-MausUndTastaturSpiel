@@ -49,6 +49,14 @@ function today() {
 const ON_RAILWAY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
 const PERSISTENT = !ON_RAILWAY || !!(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR);
 let saveTimer = null;
+// Zustand des Speichers, wird im Admin-Bereich angezeigt
+const storage = { savedAt: '', error: '' };
+try {
+  // Probeschreiben beim Start: zeigt sofort, ob das Volume beschreibbar ist
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(path.join(DATA_DIR, '.schreibtest'), 'ok');
+  fs.unlinkSync(path.join(DATA_DIR, '.schreibtest'));
+} catch (e) { storage.error = e.message; console.error('Speicher nicht beschreibbar:', e.message); }
 function save() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
@@ -57,7 +65,8 @@ function save() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       fs.writeFileSync(DATA_FILE + '.tmp', JSON.stringify(db));
       fs.renameSync(DATA_FILE + '.tmp', DATA_FILE);
-    } catch (e) { console.error('Speichern fehlgeschlagen:', e.message); }
+      storage.savedAt = new Date().toISOString(); storage.error = '';
+    } catch (e) { storage.error = e.message; console.error('Speichern fehlgeschlagen:', e.message); }
   }, 300);
 }
 
@@ -136,7 +145,11 @@ function api(req, res, url) {
     if (limited(req, 'admin', 20)) return send(res, 429, { error: 'zu viele Anfragen' });
     if (!isAdmin(req)) return setTimeout(() => send(res, 401, { error: 'falsches Passwort' }), 500);
     if (url === '/api/admin/data' && req.method === 'GET')
-      return send(res, 200, { stats: db.stats, feedback: db.feedback, levelOrder: LEVELS, storage: { persistent: PERSISTENT, onRailway: ON_RAILWAY } });
+      return send(res, 200, { stats: db.stats, feedback: db.feedback, levelOrder: LEVELS, storage: {
+        persistent: PERSISTENT, onRailway: ON_RAILWAY,
+        volume: process.env.RAILWAY_VOLUME_MOUNT_PATH || '', volumeName: process.env.RAILWAY_VOLUME_NAME || '',
+        savedAt: storage.savedAt, error: storage.error
+      } });
     const m = /^\/api\/admin\/feedback\/([0-9a-f]{12})$/.exec(url);
     if (m && req.method === 'DELETE') {
       db.feedback = db.feedback.filter(f => f.id !== m[1]);
