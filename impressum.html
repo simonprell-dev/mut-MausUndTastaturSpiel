@@ -90,18 +90,22 @@
 <script src="js/config.js"></script>
 <script>
 'use strict';
+// Der Server füllt die Angaben schon aus. Dieses Skript ist nur der Ersatz, falls die Datei
+// ohne den Spielserver geöffnet wird.
 let missing = false;
+const hide = id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); };
 for (const el of document.querySelectorAll('[data-f]')) {
   const v = (SITE[el.dataset.f] || '').trim();
-  if (v) el.textContent = v;
+  if (v) { el.textContent = v; el.className = ''; }
   else if (!('optional' in el.dataset)) { el.textContent = 'fehlt noch'; el.className = 'missing'; missing = true; }
 }
-if (!SITE.phone) document.getElementById('phoneRow').classList.add('hidden');
-if (!SITE.vatId) document.getElementById('vatRow').classList.add('hidden');
+if (!SITE.phone) hide('phoneRow');
+if (!SITE.vatId) hide('vatRow');
 const url = document.getElementById('url');
-if (/^https?:\/\//.test(SITE.url)) { url.href = SITE.url; url.textContent = SITE.url; }
-else document.getElementById('urlRow').classList.add('hidden');
-if (missing) document.getElementById('warn').classList.remove('hidden');
+if (url && /^https?:\/\//.test(SITE.url)) { url.href = SITE.url; url.textContent = SITE.url; }
+else if (!/^https?:\/\//.test(SITE.url)) hide('urlRow');
+const warn = document.getElementById('warn');
+if (warn) warn.classList.toggle('hidden', !missing);
 </script>
 </body>
 </html>

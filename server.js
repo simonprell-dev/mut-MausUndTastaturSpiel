@@ -70,6 +70,31 @@ function save() {
   }, 300);
 }
 
+// ---------------------------------------------------------------- Impressum
+// Die Angaben aus js/config.js werden schon auf dem Server ins HTML geschrieben. So stehen sie
+// auch für Leser ohne JavaScript da (Suchmaschinen, Vorlese- und Abruf-Programme).
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderImpressum(html) {
+  let site;
+  try { site = require('vm').runInNewContext(fs.readFileSync(path.join(ROOT, 'js', 'config.js'), 'utf8') + ';SITE'); }
+  catch (e) { return html; }
+  let missing = false;
+  html = html.replace(/<span data-f="(\w+)"( data-optional)?><\/span>/g, (m, key, optional) => {
+    const v = String(site[key] || '').trim();
+    if (v) return '<span data-f="' + key + '"' + (optional || '') + '>' + esc(v) + '</span>';
+    if (optional) return m;
+    missing = true;
+    return '<span data-f="' + key + '" class="missing">fehlt noch</span>';
+  });
+  if (!String(site.phone || '').trim()) html = html.replace(/\s*<span id="phoneRow">[\s\S]*?<\/span><\/span>/, '');
+  if (!String(site.vatId || '').trim()) html = html.replace(/\s*<p id="vatRow">[\s\S]*?<\/p>/, '');
+  if (/^https?:\/\//.test(site.url || '')) html = html.replace('<a id="url" rel="noopener"></a>', '<a id="url" rel="noopener" href="' + esc(site.url) + '">' + esc(site.url) + '</a>');
+  else html = html.replace(/\s*<p id="urlRow">[\s\S]*?<\/p>/, '');
+  // Der Warnhinweis gehört nur ins HTML, wenn wirklich etwas fehlt
+  html = missing ? html.replace('<div id="warn" class="hidden">', '<div id="warn">') : html.replace(/\s*<div id="warn"[\s\S]*?<\/div>/, '');
+  return html;
+}
+
 // ---------------------------------------------------------------- Helfer
 function send(res, code, body, type) {
   const isObj = typeof body === 'object';
@@ -172,6 +197,7 @@ http.createServer((req, res) => {
   if ((req.method !== 'GET' && req.method !== 'HEAD') || !ALLOWED.test(url)) return send(res, 404, 'Nicht gefunden');
   fs.readFile(path.join(ROOT, url), (err, data) => {
     if (err) return send(res, 404, 'Nicht gefunden');
+    if (url === '/impressum.html') data = Buffer.from(renderImpressum(data.toString('utf8')));
     res.writeHead(200, {
       'Content-Type': TYPES[path.extname(url)] || 'application/octet-stream',
       // Aufnahmen tragen einen Inhalts-Hash im Namen und dürfen lange im Cache bleiben
