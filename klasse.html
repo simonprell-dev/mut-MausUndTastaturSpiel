@@ -122,7 +122,7 @@
           </div>
           <div class="row"><label>Klammi spricht auf diesem Gerät:
             <select id="talk">
-              <option value="third" selected>alles – sobald ein Drittel der Kinder so weit ist</option>
+              <option value="share" id="talkShare" selected>alles – sobald 80 % der Kinder so weit sind</option>
               <option value="first">alles – sobald das erste Kind so weit ist</option>
               <option value="intro">nur die Erklärung am Level-Anfang</option>
               <option value="off">gar nicht (ich erkläre selbst)</option>
@@ -131,8 +131,8 @@
           <div class="row"><label>Lautstärke Stimme <input type="range" id="volume" min="0" max="100" value="90"></label></div>
           <div class="row"><label>Musik:
             <select id="music">
-              <option value="disco" selected>nur in der Doppelklick-Disko (wie im Spiel)</option>
-              <option value="all">in jedem Level</option>
+              <option value="disco">nur in der Doppelklick-Disko (wie im Spiel)</option>
+              <option value="all" selected>in jedem Level</option>
               <option value="off">aus</option>
             </select></label>
             <label>Lautstärke Musik <input type="range" id="musicVol" min="0" max="100" value="50"></label></div>
@@ -164,7 +164,8 @@
           <button class="big" id="next">Spiel starten</button>
           <button id="hold" class="hidden">Noch warten</button>
           <button id="play">Erklärung abspielen</button>
-          <button id="stop">Ton stoppen</button>
+          <button id="stop">Erklärung stoppen</button>
+          <button id="mute" aria-pressed="false">Ton stoppen</button>
         </div>
         <div id="spoken" class="idle">Hier steht, was Klammi gerade sagt.</div>
       </div>
@@ -214,10 +215,11 @@
         <ul>
           <li>Zu Beginn jedes Levels spricht Klammi die Erklärung. Der gesprochene Satz steht zum Mitlesen groß auf dieser Seite.</li>
           <li><b>„Erklärung abspielen“</b> spielt die Erklärung des aktuellen Levels noch einmal, zum Beispiel wenn es unruhig war.</li>
-          <li><b>„Ton stoppen“</b> bricht sofort ab. Die Lautstärke stellen Sie mit dem Regler ein.</li>
-          <li><b>Mitten im Level</b> spricht Klammi ebenfalls über Ihr Gerät: Sobald ein Drittel der Kinder an einer Stelle angekommen ist, wird der Satz einmal für alle gesprochen. Schnellere Kinder haben ihn dann schon gelesen, langsamere hören ihn etwas früher. Jeder Satz kommt pro Level nur einmal.</li>
+          <li><b>„Erklärung stoppen“</b> bricht nur das ab, was Klammi gerade sagt. Die Musik läuft weiter.</li>
+          <li><b>„Ton stoppen“</b> schaltet Stimme und Musik ganz aus, bis Sie auf „Ton wieder einschalten“ oder „Erklärung abspielen“ klicken. Die Lautstärken stellen Sie mit den Reglern ein.</li>
+          <li><b>Mitten im Level</b> spricht Klammi ebenfalls über Ihr Gerät: Sobald der oben eingestellte Anteil der Kinder (voreingestellt 80 %) an einer Stelle angekommen ist, wird der Satz einmal für alle gesprochen. Schnellere Kinder haben ihn dann schon gelesen, langsamere hören ihn etwas früher. Jeder Satz kommt pro Level nur einmal.</li>
           <li>Unter „Klammi spricht auf diesem Gerät“ stellen Sie das um: schon beim ersten Kind, nur die Erklärung am Anfang, oder gar nicht, wenn Sie lieber selbst erklären.</li>
-          <li><b>Musik:</b> Die Disko-Melodie läuft wie im Spiel im Level „Doppelklick-Disko“, auf Wunsch in jedem Level oder gar nicht. Sie hat einen eigenen Lautstärke-Regler und wird leiser, solange Klammi spricht.</li>
+          <li><b>Musik:</b> Die Disko-Melodie läuft in jedem Level, auf Wunsch nur im Level „Doppelklick-Disko“ oder gar nicht. Sie hat einen eigenen Lautstärke-Regler und wird leiser, solange Klammi spricht.</li>
         </ul>
 
         <h3>Die Vorschau „Das sehen die Kinder“</h3>
@@ -292,10 +294,11 @@ let lastStep = null;
 try { room = JSON.parse(sessionStorage.getItem('klammiLehrer') || 'null'); } catch (e) { room = null; }
 
 // ---------------------------------------------------------------- Ton (Klammis Erklärungen)
+let master = null, soundOff = false;   // Hauptschalter für Stimme und Musik
 let ac = null, gain = null, run = 0, sources = [], timers = [];
 const buffers = {};
 function unlock() {
-  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); gain = ac.createGain(); gain.connect(ac.destination); gain.gain.value = $('volume').value / 100; }
+  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.connect(ac.destination); master.gain.value = soundOff ? 0 : 1; gain = ac.createGain(); gain.connect(master); gain.gain.value = $('volume').value / 100; }
   if (ac.state === 'suspended') ac.resume();
 }
 function load(file) {
@@ -349,7 +352,7 @@ function takeLines(lines, step) {
   for (const l of lines || []) {
     if (l.seq <= seenSeq) continue;
     seenSeq = l.seq;
-    if (!first && (mode === 'third' || mode === 'first') && !intro.has(l.f)) queue.push(l.f);
+    if (!first && (mode === 'share' || mode === 'first') && !intro.has(l.f)) queue.push(l.f);
   }
   if (queue.length > 3) queue = queue.slice(-2);   // nicht hinterherhinken
   pump();
@@ -390,7 +393,7 @@ function musicNote(f, type, at, dur, vol) {
 }
 function musicTick() {
   if (!ac) return;
-  if (!musicGain) { musicGain = ac.createGain(); musicGain.gain.value = 0; musicGain.connect(ac.destination); }
+  if (!musicGain) { musicGain = ac.createGain(); musicGain.gain.value = 0; musicGain.connect(master); }
   const want = musicWanted();
   // leiser, solange Klammi spricht
   const level = want ? ($('musicVol').value / 100) * (ac.currentTime < busyUntil ? 0.3 : 1) : 0;
@@ -474,9 +477,9 @@ function render() {
   $('hold').classList.toggle('hidden', !s.advanceIn);
   $('play').disabled = step < 0;
   // Einstellungen vom Server übernehmen (z. B. nach dem Neuladen), aber nicht während man gerade schiebt
-  if (document.activeElement !== $('threshold')) { $('threshold').value = s.threshold; $('thresholdVal').textContent = s.threshold; }
+  if (document.activeElement !== $('threshold')) { $('threshold').value = s.threshold; showThreshold(s.threshold); }
   $('auto').checked = s.auto; $('lock').checked = s.lock;
-  if (document.activeElement !== $('talk') && ($('talk').value === 'third' || $('talk').value === 'first')) $('talk').value = s.talk;
+  if (document.activeElement !== $('talk') && ($('talk').value === 'share' || $('talk').value === 'first')) $('talk').value = s.talk;
 
   const grid = $('grid');
   grid.textContent = '';
@@ -521,14 +524,25 @@ $('joinForm').onsubmit = e => {
 };
 $('next').onclick = () => { unlock(); teacher({ action: 'next' }); };
 $('hold').onclick = () => teacher({ auto: false });
-$('play').onclick = () => { if (state) playIntro(state.step, false); };
+$('play').onclick = () => { setSound(false); if (state) playIntro(state.step, false); };
 $('stop').onclick = stopSound;
+function setSound(off) {
+  soundOff = off;
+  if (master) master.gain.value = off ? 0 : 1;
+  $('mute').textContent = off ? 'Ton wieder einschalten' : 'Ton stoppen';
+  $('mute').setAttribute('aria-pressed', String(off));
+}
+$('mute').onclick = () => { unlock(); setSound(!soundOff); };
 $('auto').onchange = () => teacher({ auto: $('auto').checked });
 $('lock').onchange = () => teacher({ lock: $('lock').checked });
-$('threshold').oninput = () => { $('thresholdVal').textContent = $('threshold').value; };
+function showThreshold(v) {
+  $('thresholdVal').textContent = v;
+  $('talkShare').textContent = 'alles – sobald ' + v + ' % der Kinder so weit sind';
+}
+$('threshold').oninput = () => showThreshold($('threshold').value);
 $('threshold').onchange = () => teacher({ threshold: Number($('threshold').value) });
 $('volume').oninput = () => { if (gain) gain.gain.value = $('volume').value / 100; };
-$('talk').onchange = () => { unlock(); const v = $('talk').value; if (v === 'off') stopSound(); if (v === 'third' || v === 'first') teacher({ talk: v }); };
+$('talk').onchange = () => { unlock(); const v = $('talk').value; if (v === 'off') stopSound(); if (v === 'share' || v === 'first') teacher({ talk: v }); };
 $('music').onchange = () => { unlock(); musicTick(); };
 $('musicVol').oninput = () => { unlock(); };
 $('end').onclick = async () => {
