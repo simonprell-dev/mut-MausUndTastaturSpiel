@@ -37,13 +37,26 @@
   }
   join();
 
-  let beating = false;
+  // Was Klammi hier gerade sagt, wird dem Server gemeldet. Das Lehrergerät spricht den Satz dann für alle.
+  const saidQ = [];
+  const say = K.say.bind(K);
+  K.say = function (text, o = {}) {
+    if (Kl.joined && !Kl.ended && Kl.at >= 0) {
+      const f = Voice.file(norm(o.voice || text), o.who);
+      if (f) { saidQ.push(f); beat(); }
+    }
+    return say(text, o);
+  };
+
+  let beating = false, again = false;
   function beat() {
-    if (!Kl.joined || Kl.ended || beating) return;
+    if (!Kl.joined || Kl.ended) return;
+    if (beating) { again = true; return; }
     beating = true;
-    post('/api/class/beat', { code, id: Kl.id, key: Kl.key, at: Kl.at, done: Kl.done, idle: Kl.waiting || Kl.done ? 0 : Math.round(G.t - G.progressT) })
+    post('/api/class/beat', { code, id: Kl.id, key: Kl.key, at: Kl.at, done: Kl.done, said: saidQ.splice(0, 8), idle: Kl.waiting || Kl.done ? 0 : Math.round(G.t - G.progressT) })
       .then(r => {
         beating = false;
+        if (again) { again = false; beat(); }
         if (r.status === 404) return leave('Die Klasse wurde beendet. Du kannst allein weiterspielen.');
         if (r.status === 403) { Kl.joined = false; saved = {}; return join(); }
         if (r.status === 200) Object.assign(Kl, { step: r.body.step, active: r.body.active, doneCount: r.body.done, lock: r.body.lock });

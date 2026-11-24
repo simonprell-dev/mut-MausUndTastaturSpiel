@@ -156,6 +156,11 @@ function newClassCode() {
   do { code = ''; for (let i = 0; i < 4; i++) code += abc[crypto.randomInt(abc.length)]; } while (classes.has(code));
   return code;
 }
+// Neuer Schritt: Die Liste der gesprochenen Zeilen beginnt von vorn.
+function classStep(c, step, now) {
+  c.step = step; c.stepAt = now; c.advanceAt = 0;
+  c.said = new Map(); c.released = new Set(); c.lines = [];
+}
 // Zählt, wer den aktuellen Schritt geschafft hat, und schaltet bei Bedarf automatisch weiter.
 function classCount(c, now) {
   const active = [...c.students.values()].filter(s => now - s.seen < 20000);
@@ -163,7 +168,7 @@ function classCount(c, now) {
   const reached = c.step >= 0 && c.step < CLASS_LAST_STEP && active.length > 0 && done / active.length >= c.threshold / 100;
   if (c.auto && reached) {
     if (!c.advanceAt) c.advanceAt = now + 5000;       // kurze Vorwarnzeit, die Lehrkraft kann noch abbrechen
-    else if (now >= c.advanceAt) { c.step++; c.stepAt = now; c.advanceAt = 0; }
+    else if (now >= c.advanceAt) classStep(c, c.step + 1, now);
   } else c.advanceAt = 0;
   return { active: active.length, done };
 }
@@ -178,7 +183,7 @@ function classApi(req, res, url) {
     const now = Date.now();
     if (url === '/api/class/create') {
       if (limited(req, 'class-create', 10) || classes.size >= 300) return send(res, 429, { error: 'Im Moment können keine weiteren Klassen gestartet werden.' });
-      const c = { code: newClassCode(), key: token(), created: now, teacherSeen: now, step: -1, stepAt: now, advanceAt: 0, auto: true, threshold: 80, lock: true, students: new Map() };
+      const c = { code: newClassCode(), key: token(), created: now, teacherSeen: now, step: -1, stepAt: now, advanceAt: 0, auto: true, threshold: 80, lock: true, talk: 'third', seq: 0, said: new Map(), released: new Set(), lines: [], students: new Map() };
       classes.set(c.code, c);
       return send(res, 200, { code: c.code, key: c.key });
     }
@@ -208,6 +213,17 @@ function classApi(req, res, url) {
       s.done = body.done === true;
       s.idle = Math.max(0, Math.min(3600, Math.round(Number(body.idle) || 0)));
       const n = classCount(c, now);
+      // Welche Sätze Klammi auf diesem Gerät gerade sagt. Haben genug Kinder denselben Satz erreicht,
+      // wird er für das Lehrergerät freigegeben (jeder Satz höchstens einmal pro Level).
+      if (Array.isArray(body.said) && s.at === c.step) {
+        const need = c.talk === 'first' ? 1 : Math.max(1, Math.ceil(n.active / 3));
+        for (const f of body.said.slice(0, 8)) {
+          if (typeof f !== 'string' || !/^[kv]-[0-9a-f]{12}\.mp3$/.test(f) || c.released.has(f)) continue;
+          if (!c.said.has(f)) { if (c.said.size >= 200) continue; c.said.set(f, new Set()); }
+          c.said.get(f).add(s.id);
+          if (c.said.get(f).size >= need) { c.released.add(f); c.lines.push({ seq: ++c.seq, f }); }
+        }
+      }
       return send(res, 200, { step: c.step, active: n.active, done: n.done, lock: c.lock, name: s.name });
     }
     if (url === '/api/class/teacher') {
@@ -217,13 +233,14 @@ function classApi(req, res, url) {
         c.threshold = Math.max(10, Math.min(100, Math.round(Number(body.threshold))));
       if (typeof body.auto === 'boolean') c.auto = body.auto;
       if (typeof body.lock === 'boolean') c.lock = body.lock;
+      if (body.talk === 'third' || body.talk === 'first') c.talk = body.talk;
       if (typeof body.remove === 'string') c.students.delete(body.remove);
-      if (body.action === 'next' && c.step < CLASS_LAST_STEP) { c.step++; c.stepAt = now; c.advanceAt = 0; }
+      if (body.action === 'next' && c.step < CLASS_LAST_STEP) classStep(c, c.step + 1, now);
       if (body.action === 'end') { classes.delete(c.code); return send(res, 200, { ended: true }); }
       const n = classCount(c, now);
       return send(res, 200, {
         code: c.code, step: c.step, sinceStep: now - c.stepAt, auto: c.auto, threshold: c.threshold, lock: c.lock,
-        advanceIn: c.advanceAt ? Math.max(0, c.advanceAt - now) : 0, active: n.active, done: n.done,
+        advanceIn: c.advanceAt ? Math.max(0, c.advanceAt - now) : 0, active: n.active, done: n.done, talk: c.talk, lines: c.lines,
         students: [...c.students.values()].map(s => ({ id: s.id, name: s.name, at: s.at, done: s.done, idle: s.idle, ago: now - s.seen }))
       });
     }

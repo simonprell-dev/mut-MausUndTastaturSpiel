@@ -17,6 +17,7 @@
   .win > h2 { margin: 0; padding: 7px 12px; background: var(--title); color: #fff; font-size: 16px; letter-spacing: 1px; }
   .body { padding: 14px 16px; }
   .hidden { display: none !important; }
+  select { font: inherit; padding: 5px 8px; border: 2px solid var(--text); background: #fff; max-width: 100%; }
   button, input[type=text] { font: inherit; padding: 8px 14px; border: 2px solid var(--text); background: #fff; }
   button { background: var(--win); cursor: pointer; }
   button:hover:not(:disabled) { background: var(--green); }
@@ -32,6 +33,10 @@
   .meter { background: #fff; border: 2px solid var(--text); height: 30px; position: relative; }
   .meter .fill { background: var(--green); height: 100%; width: 0; transition: width .4s; }
   .meter .goal { position: absolute; top: -5px; bottom: -5px; width: 3px; background: var(--red); }
+  #pvBox { float: right; width: min(48%, 500px); margin: 0 0 12px 18px; }
+  #preview { display: block; width: 100%; aspect-ratio: 16 / 9; border: 2px solid var(--text); background: #000; pointer-events: none; }
+  #spoken { clear: both; }
+  @media (max-width: 820px) { #pvBox { float: none; width: 100%; margin: 0 0 12px; } }
   #spoken { min-height: 3.2em; font-size: 22px; background: var(--title); color: var(--green); padding: 12px 14px; border: 2px solid var(--text); }
   #spoken.idle { color: var(--shade); font-size: 16px; }
   #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
@@ -115,9 +120,22 @@
             <label><input type="checkbox" id="auto" checked> Automatisch weiter, wenn</label>
             <span><input type="range" id="threshold" min="50" max="100" step="5" value="80"> <b id="thresholdVal">80</b> % fertig sind</span>
           </div>
-          <div class="row"><label><input type="checkbox" id="autoSound" checked> Erklärung automatisch abspielen, wenn ein Level startet</label></div>
+          <div class="row"><label>Klammi spricht auf diesem Gerät:
+            <select id="talk">
+              <option value="third" selected>alles – sobald ein Drittel der Kinder so weit ist</option>
+              <option value="first">alles – sobald das erste Kind so weit ist</option>
+              <option value="intro">nur die Erklärung am Level-Anfang</option>
+              <option value="off">gar nicht (ich erkläre selbst)</option>
+            </select></label></div>
           <div class="row"><label><input type="checkbox" id="lock" checked> Kinder können Erklärungen nicht wegklicken</label></div>
-          <div class="row"><label>Lautstärke <input type="range" id="volume" min="0" max="100" value="90"></label></div>
+          <div class="row"><label>Lautstärke Stimme <input type="range" id="volume" min="0" max="100" value="90"></label></div>
+          <div class="row"><label>Musik:
+            <select id="music">
+              <option value="disco" selected>nur in der Doppelklick-Disko (wie im Spiel)</option>
+              <option value="all">in jedem Level</option>
+              <option value="off">aus</option>
+            </select></label>
+            <label>Lautstärke Musik <input type="range" id="musicVol" min="0" max="100" value="50"></label></div>
         </div>
       </div>
     </div>
@@ -125,6 +143,14 @@
     <div class="win">
       <h2 id="stepHead">LEVEL</h2>
       <div class="body">
+        <div id="pvBox">
+          <div class="pvHead"><b>Das sehen die Kinder</b></div>
+          <iframe id="preview" title="Vorschau: Das sehen die Kinder" tabindex="-1" scrolling="no"></iframe>
+          <div class="row" style="margin:6px 0 0">
+            <button id="pvDemo" class="small">Lösung vorspielen</button>
+            <button id="pvRestart" class="small">Level von vorn zeigen</button>
+          </div>
+        </div>
         <div id="stepName">Noch nicht gestartet</div>
         <div id="stepTask">Warten Sie, bis alle Kinder beigetreten sind. Dann „Spiel starten“.</div>
         <div class="row">
@@ -189,8 +215,17 @@
           <li>Zu Beginn jedes Levels spricht Klammi die Erklärung. Der gesprochene Satz steht zum Mitlesen groß auf dieser Seite.</li>
           <li><b>„Erklärung abspielen“</b> spielt die Erklärung des aktuellen Levels noch einmal, zum Beispiel wenn es unruhig war.</li>
           <li><b>„Ton stoppen“</b> bricht sofort ab. Die Lautstärke stellen Sie mit dem Regler ein.</li>
-          <li>Wenn Sie lieber selbst erklären, schalten Sie „Erklärung automatisch abspielen“ aus.</li>
-          <li>Gesprochen wird nur die Erklärung am Anfang. Klammis Kommentare während der Aufgabe lesen die Kinder in der Sprechblase.</li>
+          <li><b>Mitten im Level</b> spricht Klammi ebenfalls über Ihr Gerät: Sobald ein Drittel der Kinder an einer Stelle angekommen ist, wird der Satz einmal für alle gesprochen. Schnellere Kinder haben ihn dann schon gelesen, langsamere hören ihn etwas früher. Jeder Satz kommt pro Level nur einmal.</li>
+          <li>Unter „Klammi spricht auf diesem Gerät“ stellen Sie das um: schon beim ersten Kind, nur die Erklärung am Anfang, oder gar nicht, wenn Sie lieber selbst erklären.</li>
+          <li><b>Musik:</b> Die Disko-Melodie läuft wie im Spiel im Level „Doppelklick-Disko“, auf Wunsch in jedem Level oder gar nicht. Sie hat einen eigenen Lautstärke-Regler und wird leiser, solange Klammi spricht.</li>
+        </ul>
+
+        <h3>Die Vorschau „Das sehen die Kinder“</h3>
+        <ul>
+          <li>Das kleine Bild zeigt das aktuelle Level so, wie es auf den Geräten der Kinder aussieht. Es wechselt mit, wenn ein neues Level startet. Sie müssen dafür nichts spielen.</li>
+          <li><b>„Lösung vorspielen“</b> lässt das Spiel die Aufgabe im kleinen Bild selbst lösen. Am Beamer können Sie so zeigen, was zu tun ist.</li>
+          <li><b>„Level von vorn zeigen“</b> startet das Level im kleinen Bild neu, ohne Lösung.</li>
+          <li>Die Vorschau ist stumm und zählt weder als Kind noch als Spiel.</li>
         </ul>
 
         <h3>Die Einstellungen</h3>
@@ -228,6 +263,7 @@
   </div>
 </main>
 
+<script src="js/voice-lines.js"></script>
 <script src="js/class-lines.js"></script>
 <script>
 'use strict';
@@ -271,7 +307,7 @@ function showLine(text) {
   $('spoken').classList.toggle('idle', !text);
 }
 function stopSound() {
-  run++;
+  run++; queue = []; busyUntil = 0;
   for (const s of sources) { try { s.stop(); } catch (e) { /* schon fertig */ } }
   for (const t of timers) clearTimeout(t);
   sources = []; timers = [];
@@ -295,13 +331,100 @@ async function playIntro(step, synced, lead) {
     timers.push(setTimeout(() => showLine(l.t), Math.max(0, (at - ac.currentTime) * 1000)));
     end = Math.max(end, at + (l.d || 2) + 0.6);
   });
-  timers.push(setTimeout(() => showLine(''), (end - ac.currentTime) * 1000));
+  timers.push(setTimeout(() => { if (!queue.length) showLine(''); }, (end - ac.currentTime) * 1000));
+  busyUntil = end;
 }
+
+// ---- Sätze mitten im Level: Die Geräte der Kinder melden, was Klammi dort gerade sagt. Der Server gibt
+// einen Satz frei, sobald genug Kinder ihn erreicht haben; hier wird er dann einmal für alle gesprochen.
+const TEXT = {};
+for (const [key, file] of Object.entries(VOICE_LINES)) TEXT[file] = key.slice(2);
+let queue = [], busyUntil = 0, seenSeq = -1, pumping = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function takeLines(lines, step) {
+  const first = seenSeq < 0;           // beim Öffnen der Seite nichts Altes nachholen
+  if (first) seenSeq = 0;
+  const intro = new Set((CLASS_INTRO[(STEPS[step] || [])[0]] || []).map(l => l.f));
+  const mode = $('talk').value;
+  for (const l of lines || []) {
+    if (l.seq <= seenSeq) continue;
+    seenSeq = l.seq;
+    if (!first && (mode === 'third' || mode === 'first') && !intro.has(l.f)) queue.push(l.f);
+  }
+  if (queue.length > 3) queue = queue.slice(-2);   // nicht hinterherhinken
+  pump();
+}
+async function pump() {
+  if (pumping || !ac) return;
+  pumping = true;
+  while (queue.length) {
+    if (ac.currentTime < busyUntil) { await sleep((busyUntil - ac.currentTime) * 1000 + 40); continue; }
+    const f = queue.shift(), mine = run;
+    try {
+      const buf = await load(f);
+      if (mine !== run) continue;
+      const s = ac.createBufferSource(); s.buffer = buf; s.connect(gain); s.start(); sources.push(s);
+      busyUntil = ac.currentTime + buf.duration + 0.25;
+      showLine(TEXT[f]);
+      timers.push(setTimeout(() => { if (!queue.length && ac.currentTime >= busyUntil - 0.1) showLine(''); }, buf.duration * 1000 + 500));
+    } catch (e) { /* Aufnahme fehlt: überspringen */ }
+  }
+  pumping = false;
+}
+
+// ---- Musik: die Disko-Melodie aus dem Spiel, hier auf dem Lehrergerät
+const DISCO = {
+  lead: [440, 0, 523, 0, 659, 523, 0, 440, 392, 0, 494, 0, 587, 494, 0, 392, 349, 0, 440, 0, 523, 440, 0, 349, 392, 0, 494, 587, 659, 0, 587, 494],
+  bass: [110, 0, 0, 110, 0, 0, 110, 0, 98, 0, 0, 98, 0, 0, 98, 0, 87, 0, 0, 87, 0, 0, 87, 0, 98, 0, 0, 98, 0, 98, 0, 0]
+};
+let musicGain = null, musicNext = 0, musicStep = 0;
+function musicWanted() {
+  const m = $('music').value;
+  return !!state && state.step >= 0 && (m === 'all' || (m === 'disco' && STEPS[state.step][0] === 'l2'));
+}
+function musicNote(f, type, at, dur, vol) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+  o.connect(g); g.connect(musicGain); o.start(at); o.stop(at + dur + 0.02);
+}
+function musicTick() {
+  if (!ac) return;
+  if (!musicGain) { musicGain = ac.createGain(); musicGain.gain.value = 0; musicGain.connect(ac.destination); }
+  const want = musicWanted();
+  // leiser, solange Klammi spricht
+  const level = want ? ($('musicVol').value / 100) * (ac.currentTime < busyUntil ? 0.3 : 1) : 0;
+  musicGain.gain.setTargetAtTime(level, ac.currentTime, 0.08);
+  if (!want) { musicNext = 0; return; }
+  if (musicNext < ac.currentTime) musicNext = ac.currentTime + 0.05;
+  while (musicNext < ac.currentTime + 1.5) {      // etwas voraus planen, falls der Browser das Fenster bremst
+    const n = DISCO.lead[musicStep % 32], b = DISCO.bass[musicStep % 32];
+    if (n) musicNote(n, 'square', musicNext, 0.1, 0.09);
+    if (b) musicNote(b, 'triangle', musicNext, 0.12, 0.3);
+    musicNext += 0.125; musicStep++;
+  }
+}
+setInterval(musicTick, 100);
 // nächste Erklärung schon einmal laden, damit sie ohne Verzögerung startet
 function preload(step) {
   if (!ac || !STEPS[step]) return;
   for (const l of CLASS_INTRO[STEPS[step][0]] || []) if (l.f) load(l.f).catch(() => {});
 }
+
+// ---------------------------------------------------------------- Vorschau: Das sehen die Kinder
+// Im kleinen Rahmen läuft das Spiel selbst im Vorschau-Modus. Es zeigt das aktuelle Level und spielt
+// auf Wunsch die Lösung vor. Bedienen muss (und kann) man es nicht.
+let pvReady = false, pvDemo = false;
+function pvShow(restart) {
+  if (!pvReady) return;
+  const scene = !state || state.step < 0 ? 'title' : STEPS[state.step][0];
+  $('preview').contentWindow.postMessage({ type: 'klammi-preview', scene, demo: pvDemo, restart: !!restart }, location.origin);
+  $('pvDemo').textContent = pvDemo ? 'Vorspielen beenden' : 'Lösung vorspielen';
+  $('pvDemo').disabled = $('pvRestart').disabled = !state || state.step < 0;
+}
+$('preview').addEventListener('load', () => { pvReady = true; pvShow(true); });
+$('pvDemo').onclick = () => { pvDemo = !pvDemo; pvShow(true); };
+$('pvRestart').onclick = () => { pvDemo = false; pvShow(true); };
 
 // ---------------------------------------------------------------- Verbindung zum Server
 async function teacher(extra) {
@@ -312,8 +435,13 @@ async function teacher(extra) {
   if (r.status === 404 || r.status === 403 || r.body.ended) { leave(); return; }
   if (r.status !== 200) return;
   state = r.body;
-  if (lastStep !== null && state.step > lastStep && $('autoSound').checked) playIntro(state.step, true, extra && extra.action === 'next' ? 1.0 : 0.3);
+  const lead = extra && extra.action === 'next' ? 1.0 : 0.3;
+  if (lastStep !== null && state.step > lastStep && $('talk').value !== 'off') playIntro(state.step, true, lead);
+  // die Vorschau startet das neue Level zeitgleich mit den Kindern
+  if (lastStep === null) pvShow(false);
+  else if (state.step > lastStep) { pvDemo = false; setTimeout(() => pvShow(true), lead * 1000); }
   lastStep = state.step;
+  takeLines(state.lines, state.step);
   preload(state.step + 1);
   render();
 }
@@ -327,6 +455,7 @@ function enter() {
   $('start').classList.add('hidden'); $('room').classList.remove('hidden');
   $('code').textContent = room.code;
   $('joinUrl').textContent = location.host + '/k/' + room.code;
+  if (!$('preview').getAttribute('src')) $('preview').src = '/?vorschau=1';
   teacher();
 }
 
@@ -347,6 +476,7 @@ function render() {
   // Einstellungen vom Server übernehmen (z. B. nach dem Neuladen), aber nicht während man gerade schiebt
   if (document.activeElement !== $('threshold')) { $('threshold').value = s.threshold; $('thresholdVal').textContent = s.threshold; }
   $('auto').checked = s.auto; $('lock').checked = s.lock;
+  if (document.activeElement !== $('talk') && ($('talk').value === 'third' || $('talk').value === 'first')) $('talk').value = s.talk;
 
   const grid = $('grid');
   grid.textContent = '';
@@ -398,6 +528,9 @@ $('lock').onchange = () => teacher({ lock: $('lock').checked });
 $('threshold').oninput = () => { $('thresholdVal').textContent = $('threshold').value; };
 $('threshold').onchange = () => teacher({ threshold: Number($('threshold').value) });
 $('volume').oninput = () => { if (gain) gain.gain.value = $('volume').value / 100; };
+$('talk').onchange = () => { unlock(); const v = $('talk').value; if (v === 'off') stopSound(); if (v === 'third' || v === 'first') teacher({ talk: v }); };
+$('music').onchange = () => { unlock(); musicTick(); };
+$('musicVol').oninput = () => { unlock(); };
 $('end').onclick = async () => {
   if (!confirm('Klasse wirklich beenden? Die Kinder können danach allein weiterspielen.')) return;
   try { await post('/api/class/teacher', { code: room.code, key: room.key, action: 'end' }); } catch (e) { /* egal */ }
