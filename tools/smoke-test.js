@@ -29,7 +29,8 @@ vm.runInThisContext(`{
 global.require = require;
 
 const run = vm.runInThisContext(`(async function (opts) {
-  const tick = () => new Promise(r => setImmediate(r));
+  // Im Klassenzimmer wartet das Spiel auf den Server: dann in Echtzeit weiterlaufen statt Bilder zu verheizen
+  const tick = () => new Promise(r => (G.klass && !G.klass.ended && (G.klass.waiting || G.sceneName === 'title') ? setTimeout(r, 25) : setImmediate(r)));
   const DT = 1 / 60;
   let errors = 0;
   const origErr = console.error; console.error = (...a) => { errors++; origErr(...a); };
@@ -82,10 +83,42 @@ const run = vm.runInThisContext(`(async function (opts) {
   return { ok: false, time: G.t, errors, stuck: G.sceneName + '/' + (G.scene && G.scene.phase), maxOpen };
 })`);
 
+// Klassenzimmer-Durchlauf: node tools/smoke-test.js --class=http://localhost:3000  (Server muss laufen)
+// Der Bot spielt als Schülergerät, eine simulierte Lehrkraft startet die Klasse, danach schaltet die Automatik weiter.
+async function joinClass(base) {
+  const post = (u, b) => fetch(base + u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.json());
+  const cls = await post('/api/class/create', {});
+  const store = {};
+  global.sessionStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  global.location = { search: '?klasse=' + cls.code, protocol: 'http:', hash: '', origin: base, pathname: '/' };
+  const realFetch = fetch;
+  global.fetch = (u, o) => realFetch(String(u).startsWith('/') ? base + u : u, o);
+  for (const f of ['class-lines', 'classroom'])
+    vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), { filename: f + '.js' });
+  const teacher = extra => post('/api/class/teacher', Object.assign({ code: cls.code, key: cls.key }, extra || {}));
+  const started = setInterval(async () => {
+    const s = await teacher();
+    if (s.step < 0 && s.active > 0) { await teacher({ action: 'next' }); console.log('  Lehrkraft startet Klasse ' + cls.code); }
+  }, 500);
+  return { teacher, stop: () => clearInterval(started) };
+}
+
 (async () => {
   const mischief = process.argv.includes('--mischief');
-  console.log('Durchlauf' + (mischief ? ' (mit Fehlklicks)' : '') + ':');
+  const classBase = (process.argv.find(a => a.startsWith('--class=')) || '').slice(8);
+  console.log('Durchlauf' + (mischief ? ' (mit Fehlklicks)' : '') + (classBase ? ' (Klassenzimmer)' : '') + ':');
+  const cls = classBase ? await joinClass(classBase) : null;
   const res = await run({ mischief });
+  if (cls) {
+    // noch ein Bild rechnen und dem Gerät Zeit für die letzte Meldung geben
+    vm.runInThisContext('G.frameStep(1 / 60)');
+    await new Promise(r => setTimeout(r, 2500));
+    const s = await cls.teacher();
+    cls.stop();
+    res.klasse = { step: s.step, student: s.students.map(k => k.name + ': Schritt ' + k.at + (k.done ? ' fertig' : '')) };
+    res.ok = res.ok && s.step === 12 && s.students[0].at === 12 && s.students[0].done;
+    await cls.teacher({ action: 'end' });
+  }
   console.log(res);
   process.exit(res.ok ? 0 : 1);
 })();

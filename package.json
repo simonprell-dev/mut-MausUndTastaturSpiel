@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tools/smoke-test.js"
+    "test": "node tools/smoke-test.js",
+    "class-lines": "node tools/make-class-lines.js"
   },
   "engines": {
     "node": ">=18"

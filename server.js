@@ -23,7 +23,7 @@ const TYPES = {
   '.png': 'image/png'
 };
 // Nur diese Dateien werden ausgeliefert.
-const ALLOWED = /^\/(favicon\.svg|favicon\.png|apple-touch-icon\.png|index\.html|admin\.html|impressum\.html|js\/[\w.-]+\.js|audio\/[\w-]+\.mp3)$/;
+const ALLOWED = /^\/(favicon\.svg|favicon\.png|apple-touch-icon\.png|index\.html|admin\.html|impressum\.html|klasse\.html|js\/[\w.-]+\.js|audio\/[\w-]+\.mp3)$/;
 
 // ---------------------------------------------------------------- Speicher
 let db = { stats: { starts: 0, finishes: 0 }, feedback: [] };
@@ -139,9 +139,102 @@ function isAdmin(req) {
 }
 
 // ---------------------------------------------------------------- Routen
+// ---------------------------------------------------------------- Klassenzimmer
+// Eine Klasse lebt nur im Arbeitsspeicher: nichts davon wird gespeichert, und nach dem Ende
+// (oder spätestens nach einigen Stunden) ist alles weg. Schüler bekommen automatisch einen
+// Tiernamen, es werden keine echten Namen erfasst.
+const classes = new Map();
+const CLASS_LAST_STEP = 12; // Schritte: boot, l1, l2, lf, l3, lw, lr, l4, ls, l5, l6, l7, end
+const ANIMALS = ['Fuchs', 'Igel', 'Dachs', 'Eule', 'Otter', 'Luchs', 'Biber', 'Wal', 'Pinguin', 'Koala', 'Panda', 'Tiger', 'Löwe', 'Zebra',
+  'Giraffe', 'Elefant', 'Papagei', 'Delfin', 'Krake', 'Robbe', 'Hase', 'Maus', 'Bär', 'Wolf', 'Adler', 'Falke', 'Schwan', 'Storch', 'Frosch',
+  'Gecko', 'Lama', 'Esel', 'Pony', 'Ziege', 'Schaf', 'Hamster', 'Marder', 'Specht', 'Möwe', 'Krebs', 'Hummel', 'Libelle', 'Seestern', 'Waschbär', 'Eisbär'];
+const token = () => crypto.randomBytes(12).toString('hex');
+const same = (a, b) => typeof a === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+function newClassCode() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne leicht verwechselbare Zeichen
+  let code;
+  do { code = ''; for (let i = 0; i < 4; i++) code += abc[crypto.randomInt(abc.length)]; } while (classes.has(code));
+  return code;
+}
+// Zählt, wer den aktuellen Schritt geschafft hat, und schaltet bei Bedarf automatisch weiter.
+function classCount(c, now) {
+  const active = [...c.students.values()].filter(s => now - s.seen < 20000);
+  const done = active.filter(s => s.at > c.step || (s.at === c.step && s.done)).length;
+  const reached = c.step >= 0 && c.step < CLASS_LAST_STEP && active.length > 0 && done / active.length >= c.threshold / 100;
+  if (c.auto && reached) {
+    if (!c.advanceAt) c.advanceAt = now + 5000;       // kurze Vorwarnzeit, die Lehrkraft kann noch abbrechen
+    else if (now >= c.advanceAt) { c.step++; c.stepAt = now; c.advanceAt = 0; }
+  } else c.advanceAt = 0;
+  return { active: active.length, done };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, c] of classes) if (now - c.teacherSeen > 90 * 60000 || now - c.created > 10 * 3600000) classes.delete(code);
+}, 60000).unref();
+
+function classApi(req, res, url) {
+  readJson(req, body => {
+    if (!body) return send(res, 400, { error: 'ungültig' });
+    const now = Date.now();
+    if (url === '/api/class/create') {
+      if (limited(req, 'class-create', 10) || classes.size >= 300) return send(res, 429, { error: 'Im Moment können keine weiteren Klassen gestartet werden.' });
+      const c = { code: newClassCode(), key: token(), created: now, teacherSeen: now, step: -1, stepAt: now, advanceAt: 0, auto: true, threshold: 80, lock: true, students: new Map() };
+      classes.set(c.code, c);
+      return send(res, 200, { code: c.code, key: c.key });
+    }
+    const c = classes.get(String(body.code || '').toUpperCase());
+    if (!c) return send(res, 404, { error: 'Diese Klasse gibt es nicht (mehr).' });
+
+    if (url === '/api/class/join') {
+      if (limited(req, 'class-join', 240)) return send(res, 429, { error: 'zu viele Anfragen' });
+      let s = c.students.get(String(body.id || ''));
+      if (!s || !same(body.key, s.key)) {
+        if (c.students.size >= 45) return send(res, 409, { error: 'Die Klasse ist voll.' });
+        const used = new Set([...c.students.values()].map(x => x.name));
+        let name = ANIMALS.find(a => !used.has(a));
+        if (!name) name = 'Gast ' + (c.students.size + 1);
+        s = { id: crypto.randomBytes(5).toString('hex'), key: token(), name, at: -1, done: false, idle: 0, seen: now };
+        c.students.set(s.id, s);
+      }
+      s.seen = now;
+      return send(res, 200, { id: s.id, key: s.key, name: s.name, step: c.step, lock: c.lock, at: s.at });
+    }
+    if (url === '/api/class/beat') {
+      const s = c.students.get(String(body.id || ''));
+      if (!s || !same(body.key, s.key)) return send(res, 403, { error: 'nicht angemeldet' });
+      s.seen = now;
+      const at = Number(body.at);
+      if (Number.isInteger(at) && at >= -1 && at <= CLASS_LAST_STEP) s.at = at;
+      s.done = body.done === true;
+      s.idle = Math.max(0, Math.min(3600, Math.round(Number(body.idle) || 0)));
+      const n = classCount(c, now);
+      return send(res, 200, { step: c.step, active: n.active, done: n.done, lock: c.lock, name: s.name });
+    }
+    if (url === '/api/class/teacher') {
+      if (!same(body.key, c.key)) return send(res, 403, { error: 'kein Zugriff' });
+      c.teacherSeen = now;
+      if (Number.isFinite(Number(body.threshold)) && body.threshold !== null && body.threshold !== undefined)
+        c.threshold = Math.max(10, Math.min(100, Math.round(Number(body.threshold))));
+      if (typeof body.auto === 'boolean') c.auto = body.auto;
+      if (typeof body.lock === 'boolean') c.lock = body.lock;
+      if (typeof body.remove === 'string') c.students.delete(body.remove);
+      if (body.action === 'next' && c.step < CLASS_LAST_STEP) { c.step++; c.stepAt = now; c.advanceAt = 0; }
+      if (body.action === 'end') { classes.delete(c.code); return send(res, 200, { ended: true }); }
+      const n = classCount(c, now);
+      return send(res, 200, {
+        code: c.code, step: c.step, sinceStep: now - c.stepAt, auto: c.auto, threshold: c.threshold, lock: c.lock,
+        advanceIn: c.advanceAt ? Math.max(0, c.advanceAt - now) : 0, active: n.active, done: n.done,
+        students: [...c.students.values()].map(s => ({ id: s.id, name: s.name, at: s.at, done: s.done, idle: s.idle, ago: now - s.seen }))
+      });
+    }
+    send(res, 404, { error: 'nicht gefunden' });
+  });
+}
+
 function api(req, res, url) {
+  if (url.startsWith('/api/class/') && req.method === 'POST') return classApi(req, res, url);
   if (url === '/api/event' && req.method === 'POST') {
-    if (limited(req, 'event', 60)) return send(res, 429, { error: 'zu viele Anfragen' });
+    if (limited(req, 'event', 240)) return send(res, 429, { error: 'zu viele Anfragen' });
     return readJson(req, body => {
       if (body && body.type === 'start') { db.stats.starts++; today().starts++; }
       else if (body && body.type === 'finish') { db.stats.finishes++; today().finishes++; }
@@ -152,7 +245,7 @@ function api(req, res, url) {
     });
   }
   if (url === '/api/feedback' && req.method === 'POST') {
-    if (limited(req, 'feedback', 5)) return send(res, 429, { error: 'zu viele Anfragen' });
+    if (limited(req, 'feedback', 40)) return send(res, 429, { error: 'zu viele Anfragen' });
     return readJson(req, body => {
       const stars = body && Number(body.stars);
       if (!Number.isInteger(stars) || stars < 1 || stars > 5) return send(res, 400, { error: 'ungültig' });
@@ -194,6 +287,10 @@ http.createServer((req, res) => {
   if (url === '/favicon.ico') url = '/favicon.png';
   if (url === '/admin') url = '/admin.html';
   if (url === '/impressum') url = '/impressum.html';
+  if (url === '/klasse') url = '/klasse.html';
+  // Kurzer Beitritts-Link für Schüler: /k/CODE
+  const join = /^\/k\/([A-Za-z0-9]{4,6})\/?$/.exec(url);
+  if (join) { res.writeHead(302, { Location: '/?klasse=' + join[1].toUpperCase(), 'Cache-Control': 'no-store' }); return res.end(); }
   if ((req.method !== 'GET' && req.method !== 'HEAD') || !ALLOWED.test(url)) return send(res, 404, 'Nicht gefunden');
   fs.readFile(path.join(ROOT, url), (err, data) => {
     if (err) return send(res, 404, 'Nicht gefunden');

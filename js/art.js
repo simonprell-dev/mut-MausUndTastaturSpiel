@@ -184,6 +184,12 @@ const K = {
       L.tts = Voice.speak(norm(o.voice || text), L.who, failed => { if (failed) { L.tts = false; L.maxT = silent; } else L.speechDone = true; });
       L.maxT = L.tts ? 5 + text.length * 0.13 : silent;
       L.lines = G.wrap(text, 236);
+      // Klassenzimmer: Der Ton läuft auf dem Lehrergerät. Die Sprechblase bleibt genau so lange
+      // stehen, wie die Aufnahme dauert, damit Bild und Ton zusammenpassen.
+      if (G.klass && !G.klass.ended && typeof VOICE_DUR !== 'undefined') {
+        const d = VOICE_DUR[(L.who === 'virus' ? 'v|' : 'k|') + norm(o.voice || text)];
+        if (d) L.minT = L.maxT = d + 0.3;
+      }
       this.line = L;
       if (o.mood) this.pose(o.mood);
     });
@@ -199,7 +205,7 @@ const K = {
     if (!L.tts && now !== before && now % 3 === 0 && now < L.text.length)
       A.tone(L.who === 'virus' ? 170 : 620 + rnd(-60, 60), 0.03, { vol: 0.025 });
     let fin = L.shown >= L.text.length && ((L.tts && L.speechDone && L.t >= L.minT) || L.t >= L.maxT);
-    if (L.block && G.mouse.pressed && G.frame !== L.born && L.t > 0.35) {
+    if (L.block && G.mouse.pressed && G.frame !== L.born && L.t > 0.35 && !(G.klass && G.klass.lock && !G.klass.ended)) {
       if (L.shown < L.text.length) L.shown = L.text.length;
       else { fin = true; L.endT = 0; Voice.stop(); }
     }

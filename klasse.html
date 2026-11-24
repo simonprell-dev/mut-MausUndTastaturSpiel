@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+<meta name="theme-color" content="#272D48">
+<title>KLAMMI.exe – Klassenzimmer</title>
+<style>
+  :root { --bg: #17191C; --win: #DEDBD0; --title: #272D48; --text: #151515; --green: #A8F18D; --orange: #F8A945; --dark: #BD6B29; --shade: #8E8B82; --red: #D8503C; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 "Courier New", monospace; padding: 16px; }
+  main { max-width: 1100px; margin: 0 auto; }
+  a { color: var(--green); }
+  .win { background: var(--win); border: 2px solid var(--text); box-shadow: 6px 6px 0 rgba(0,0,0,.4); margin-bottom: 20px; }
+  .win > h2 { margin: 0; padding: 7px 12px; background: var(--title); color: #fff; font-size: 16px; letter-spacing: 1px; }
+  .body { padding: 14px 16px; }
+  .hidden { display: none !important; }
+  button, input[type=text] { font: inherit; padding: 8px 14px; border: 2px solid var(--text); background: #fff; }
+  button { background: var(--win); cursor: pointer; }
+  button:hover:not(:disabled) { background: var(--green); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.big { font-size: 20px; font-weight: bold; padding: 12px 22px; background: var(--orange); }
+  button.small { padding: 2px 8px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin: 10px 0; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+  #code { font-size: 64px; font-weight: bold; letter-spacing: 10px; color: var(--title); line-height: 1.1; }
+  #joinUrl { font-size: 22px; font-weight: bold; word-break: break-all; }
+  #stepName { font-size: 26px; font-weight: bold; }
+  .meter { background: #fff; border: 2px solid var(--text); height: 30px; position: relative; }
+  .meter .fill { background: var(--green); height: 100%; width: 0; transition: width .4s; }
+  .meter .goal { position: absolute; top: -5px; bottom: -5px; width: 3px; background: var(--red); }
+  #spoken { min-height: 3.2em; font-size: 22px; background: var(--title); color: var(--green); padding: 12px 14px; border: 2px solid var(--text); }
+  #spoken.idle { color: var(--shade); font-size: 16px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+  .kid { border: 2px solid var(--text); padding: 8px 10px; background: #fff; }
+  .kid b { display: block; font-size: 18px; }
+  .kid small { display: block; }
+  .kid.done { background: var(--green); }
+  .kid.behind { background: var(--orange); }
+  .kid.stuck { background: var(--red); color: #fff; }
+  .kid.off { background: var(--shade); color: #fff; }
+  .kid .x { float: right; }
+  label { cursor: pointer; }
+  #countdown { font-weight: bold; color: var(--dark); }
+  #msg { color: var(--dark); min-height: 1.4em; }
+  ol, ul { margin: 6px 0; padding-left: 1.4em; }
+  li { margin: 3px 0; }
+  h3 { margin: 18px 0 4px; font-size: 17px; }
+  summary { cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; background: #fff; }
+  th, td { text-align: left; padding: 5px 8px; border: 1px solid var(--shade); vertical-align: top; }
+  th { background: var(--title); color: #fff; font-weight: normal; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    #start, #room, main > p, #print, summary { display: none !important; }
+    .win { box-shadow: none; border: none; }
+    .win > h2 { background: none; color: #000; font-size: 20px; padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">← Zurück zum Spiel</a></p>
+
+  <!-- Start: Klasse anlegen oder beitreten -->
+  <div id="start">
+    <div class="cols">
+      <div class="win">
+        <h2>FÜR LEHRKRÄFTE</h2>
+        <div class="body">
+          <p>Spielen Sie KLAMMI.exe gemeinsam mit Ihrer Klasse:</p>
+          <ol>
+            <li>Sie starten hier eine Klasse und bekommen einen Code.</li>
+            <li>Die Kinder öffnen den Link mit dem Code. Ihre Geräte bleiben stumm.</li>
+            <li>Klammis Erklärungen laufen über die Lautsprecher an <b>diesem</b> Gerät.</li>
+            <li>Sie sehen, wie weit jedes Kind ist. Das nächste Level startet per Klick oder automatisch, sobald genug Kinder fertig sind.</li>
+          </ol>
+          <p>Es werden keine Namen abgefragt: Jedes Gerät bekommt einen Tiernamen. Nach der Stunde ist alles gelöscht.</p>
+          <p><button class="big" id="create">Klasse starten</button></p>
+          <div id="msg"></div>
+        </div>
+      </div>
+      <div class="win">
+        <h2>FÜR SCHÜLERINNEN UND SCHÜLER</h2>
+        <div class="body">
+          <p>Du hast einen Klassen-Code bekommen? Tippe ihn hier ein:</p>
+          <form id="joinForm" class="row">
+            <input type="text" id="joinCode" maxlength="6" size="8" autocomplete="off" placeholder="CODE" style="text-transform:uppercase;font-size:24px;font-weight:bold;letter-spacing:4px">
+            <button type="submit" class="big">Los!</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Laufende Klasse -->
+  <div id="room" class="hidden">
+    <div class="cols">
+      <div class="win">
+        <h2>BEITRETEN</h2>
+        <div class="body">
+          <div>Die Kinder öffnen im Browser:</div>
+          <div id="joinUrl"></div>
+          <div style="margin-top:8px">oder geben auf der Seite „Für Schulklassen“ diesen Code ein:</div>
+          <div id="code"></div>
+        </div>
+      </div>
+      <div class="win">
+        <h2>EINSTELLUNGEN</h2>
+        <div class="body">
+          <div class="row">
+            <label><input type="checkbox" id="auto" checked> Automatisch weiter, wenn</label>
+            <span><input type="range" id="threshold" min="50" max="100" step="5" value="80"> <b id="thresholdVal">80</b> % fertig sind</span>
+          </div>
+          <div class="row"><label><input type="checkbox" id="autoSound" checked> Erklärung automatisch abspielen, wenn ein Level startet</label></div>
+          <div class="row"><label><input type="checkbox" id="lock" checked> Kinder können Erklärungen nicht wegklicken</label></div>
+          <div class="row"><label>Lautstärke <input type="range" id="volume" min="0" max="100" value="90"></label></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="win">
+      <h2 id="stepHead">LEVEL</h2>
+      <div class="body">
+        <div id="stepName">Noch nicht gestartet</div>
+        <div id="stepTask">Warten Sie, bis alle Kinder beigetreten sind. Dann „Spiel starten“.</div>
+        <div class="row">
+          <div style="flex:1;min-width:240px">
+            <div class="meter"><div class="fill" id="fill"></div><div class="goal" id="goal"></div></div>
+            <div id="count"></div>
+          </div>
+          <span id="countdown"></span>
+        </div>
+        <div class="row">
+          <button class="big" id="next">Spiel starten</button>
+          <button id="hold" class="hidden">Noch warten</button>
+          <button id="play">Erklärung abspielen</button>
+          <button id="stop">Ton stoppen</button>
+        </div>
+        <div id="spoken" class="idle">Hier steht, was Klammi gerade sagt.</div>
+      </div>
+    </div>
+
+    <div class="win">
+      <h2>SO WEIT SIND DIE KINDER</h2>
+      <div class="body">
+        <div id="grid"></div>
+        <p id="empty">Noch ist niemand beigetreten.</p>
+        <p><small>Grün = fertig mit dem aktuellen Level · Weiß = spielt · Orange = noch in einem früheren Level · Rot = kommt seit einer Weile nicht weiter · Grau = Gerät nicht verbunden</small></p>
+      </div>
+    </div>
+    <p><button id="end">Klasse beenden</button></p>
+  </div>
+
+  <!-- Anleitung: immer erreichbar, auch während die Klasse läuft -->
+  <div class="win" id="guide">
+    <h2>ANLEITUNG FÜR LEHRKRÄFTE</h2>
+    <div class="body">
+      <details id="guideBox" open>
+        <summary><b>Anleitung ein- und ausklappen</b> <button class="small" id="print" type="button">Drucken</button></summary>
+
+        <h3>Worum geht es?</h3>
+        <p>KLAMMI.exe ist ein Lernspiel, in dem Kinder ab etwa 8 Jahren die Bedienung von Maus und Tastatur üben. Die Büroklammer Klammi hat aus Versehen das Programm CHAOS.EXE gestartet, und die Kinder helfen beim Aufräumen. Jedes Level übt genau eine Fähigkeit, zum Beispiel Doppelklick, Ziehen oder Speichern.</p>
+        <p>Im Klassenzimmer-Modus spielt die ganze Klasse gemeinsam, Level für Level. Die Geräte der Kinder sind stumm. Klammis Erklärungen kommen aus den Lautsprechern Ihres Geräts, damit es im Raum nicht durcheinander tönt.</p>
+
+        <h3>Das brauchen Sie</h3>
+        <ul>
+          <li><b>Ihr Gerät</b> mit Lautsprechern, am besten am Beamer oder an der Tafel. Darauf läuft diese Seite.</li>
+          <li><b>Pro Kind ein Gerät</b> mit Maus und Tastatur (Laptop oder PC). Tablets und Handys eignen sich nicht, weil Maus, Mausrad und Tastatur geübt werden.</li>
+          <li>Einen aktuellen Browser und Internet auf allen Geräten. Eine Anmeldung oder Installation ist nicht nötig.</li>
+          <li>Etwa eine Schulstunde Zeit.</li>
+        </ul>
+
+        <h3>Ablauf</h3>
+        <ol>
+          <li><b>Klasse starten:</b> Klicken Sie oben auf „Klasse starten“. Sie bekommen einen Code aus vier Zeichen.</li>
+          <li><b>Kinder treten bei:</b> Die Kinder öffnen die angezeigte Adresse mit dem Code. Jedes Gerät zeigt einen Tiernamen, zum Beispiel „Du bist: Fuchs“. Unter diesem Namen erscheint es bei Ihnen in der Übersicht.</li>
+          <li><b>Spiel starten:</b> Wenn alle da sind, klicken Sie auf „Spiel starten“. Alle Geräte beginnen gleichzeitig.</li>
+          <li><b>Level für Level:</b> Klammi erklärt über Ihre Lautsprecher die Aufgabe, die Kinder lösen sie am eigenen Gerät. Wer fertig ist, sieht „Geschafft!“ und wartet auf die anderen.</li>
+          <li><b>Weiter:</b> Das nächste Level startet automatisch, sobald genug Kinder fertig sind, oder wenn Sie auf „Weiter zum nächsten Level“ klicken.</li>
+          <li><b>Ende:</b> Im letzten Schritt tippt jedes Kind seinen Namen und bekommt eine Urkunde. Der Name bleibt auf dem Gerät des Kindes. Danach klicken Sie auf „Klasse beenden“.</li>
+        </ol>
+
+        <h3>Der Ton</h3>
+        <ul>
+          <li>Zu Beginn jedes Levels spricht Klammi die Erklärung. Der gesprochene Satz steht zum Mitlesen groß auf dieser Seite.</li>
+          <li><b>„Erklärung abspielen“</b> spielt die Erklärung des aktuellen Levels noch einmal, zum Beispiel wenn es unruhig war.</li>
+          <li><b>„Ton stoppen“</b> bricht sofort ab. Die Lautstärke stellen Sie mit dem Regler ein.</li>
+          <li>Wenn Sie lieber selbst erklären, schalten Sie „Erklärung automatisch abspielen“ aus.</li>
+          <li>Gesprochen wird nur die Erklärung am Anfang. Klammis Kommentare während der Aufgabe lesen die Kinder in der Sprechblase.</li>
+        </ul>
+
+        <h3>Die Einstellungen</h3>
+        <ul>
+          <li><b>Automatisch weiter, wenn … % fertig sind:</b> Voreingestellt sind 80 %. Ist der Anteil erreicht, läuft ein Countdown von 5 Sekunden; mit „Noch warten“ halten Sie ihn an. Bei 100 % wartet die Klasse auf alle Kinder. Ohne Häkchen schalten nur Sie weiter.</li>
+          <li><b>Kinder können Erklärungen nicht wegklicken:</b> So bleiben Sprechblase und Ton zusammen. Ohne Häkchen können schnelle Kinder vorklicken.</li>
+        </ul>
+
+        <h3>Die Übersicht lesen</h3>
+        <ul>
+          <li><b>Grün – fertig:</b> hat das aktuelle Level geschafft und wartet.</li>
+          <li><b>Weiß – spielt:</b> arbeitet gerade an der Aufgabe.</li>
+          <li><b>Orange – noch in einem früheren Level:</b> Das Kind spielt sein Level zu Ende und holt dann von selbst auf, allerdings ohne Ton.</li>
+          <li><b>Rot – kommt nicht weiter:</b> seit über 45 Sekunden kein Fortschritt. Hier lohnt sich ein Blick über die Schulter. Im Spiel zeigt nach kurzer Zeit auch ein grüner Pfeil auf das nächste Ziel.</li>
+          <li><b>Grau – nicht verbunden:</b> Das Gerät meldet sich nicht mehr, zum Beispiel weil der Browser geschlossen wurde. Solche Geräte zählen nicht mit. Mit dem × entfernen Sie sie.</li>
+        </ul>
+
+        <h3>Wenn etwas hakt</h3>
+        <ul>
+          <li><b>Ein Kind hat die Seite neu geladen:</b> Kein Problem, das Gerät bleibt mit demselben Tiernamen in der Klasse, beginnt das aktuelle Level aber von vorn.</li>
+          <li><b>„Diese Klasse gibt es nicht“:</b> Der Code ist vertippt, oder die Klasse wurde beendet.</li>
+          <li><b>Sie haben diese Seite neu geladen:</b> Die Klasse läuft weiter, solange Sie im selben Browser-Fenster bleiben. Klicken Sie einmal auf „Erklärung abspielen“, damit der Browser den Ton wieder zulässt.</li>
+          <li><b>Kein Ton:</b> Lautstärke am Gerät und den Regler hier prüfen. Der Browser gibt Ton erst frei, nachdem Sie auf dieser Seite etwas angeklickt haben.</li>
+          <li><b>Ein Kind fehlt in der Zählung:</b> Geräte, die sich 20 Sekunden nicht gemeldet haben, werden nicht mitgezählt.</li>
+          <li>Eine Klasse wird automatisch gelöscht, wenn diese Seite 90 Minuten lang geschlossen war.</li>
+        </ul>
+
+        <h3>Datenschutz</h3>
+        <p>Es werden keine Namen und keine Konten abgefragt. Jedes Gerät bekommt einen zufälligen Tiernamen. Der Stand der Klasse liegt nur im Arbeitsspeicher des Servers, wird nicht gespeichert und ist nach dem Beenden gelöscht. Einzelheiten stehen unter <a href="impressum.html" style="color:var(--title)">Impressum &amp; Datenschutz</a>.</p>
+
+        <h3>Die Level und was geübt wird</h3>
+        <table id="levels"><thead><tr><th>Nr.</th><th>Level</th><th>Das üben die Kinder</th></tr></thead><tbody></tbody></table>
+      </details>
+    </div>
+  </div>
+</main>
+
+<script src="js/class-lines.js"></script>
+<script>
+'use strict';
+const STEPS = [
+  ['boot', 'Systemstart', 'Klammi stellt sich vor. Aufgabe: auf „Computer retten“ klicken.'],
+  ['l1', 'Cursorjagd', 'Maus bewegen und mit der linken Maustaste klicken.'],
+  ['l2', 'Doppelklick-Disko', 'Ordner per Doppelklick öffnen, Fenster mit dem × schließen.'],
+  ['lf', 'Die Schatzkarte', 'Fenster klein machen, zurückholen, groß machen.'],
+  ['l3', 'Das große Datei-Chaos', 'Dateien mit gedrückter Maustaste in den richtigen Ordner ziehen.'],
+  ['lw', 'Die lange Anleitung', 'Mit dem Mausrad nach unten und wieder nach oben blättern.'],
+  ['lr', 'Das geheime Menü', 'Rechtsklick öffnet ein Menü, Linksklick wählt aus.'],
+  ['l4', 'Buchstabensalat', 'Tasten finden, Wörter tippen, Fehler mit der Löschtaste löschen.'],
+  ['ls', 'Klammis Gedicht', 'Speichern mit der Diskette und mit Strg+S.'],
+  ['l5', 'Tastatur-Turbo', 'Roboter mit Pfeiltasten und Leertaste steuern, mit Enter bestätigen.'],
+  ['l6', 'Fehlermeldungs-Wahnsinn', 'Fehlermeldungen genau lesen, bevor man klickt.'],
+  ['l7', 'Der Virus', 'Alles zusammen: klicken, ziehen, tippen.'],
+  ['end', 'Urkunde', 'Namen tippen und Urkunde ansehen.']
+];
+const $ = id => document.getElementById(id);
+const post = (url, data) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+  .then(r => r.json().then(j => ({ status: r.status, body: j })));
+
+let room = null;        // { code, key }
+let state = null;       // letzter Stand vom Server
+let lastStep = null;
+try { room = JSON.parse(sessionStorage.getItem('klammiLehrer') || 'null'); } catch (e) { room = null; }
+
+// ---------------------------------------------------------------- Ton (Klammis Erklärungen)
+let ac = null, gain = null, run = 0, sources = [], timers = [];
+const buffers = {};
+function unlock() {
+  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); gain = ac.createGain(); gain.connect(ac.destination); gain.gain.value = $('volume').value / 100; }
+  if (ac.state === 'suspended') ac.resume();
+}
+function load(file) {
+  if (!buffers[file]) buffers[file] = fetch('audio/' + file).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no)));
+  return buffers[file];
+}
+function showLine(text) {
+  $('spoken').textContent = text || 'Hier steht, was Klammi gerade sagt.';
+  $('spoken').classList.toggle('idle', !text);
+}
+function stopSound() {
+  run++;
+  for (const s of sources) { try { s.stop(); } catch (e) { /* schon fertig */ } }
+  for (const t of timers) clearTimeout(t);
+  sources = []; timers = [];
+  showLine('');
+}
+// Spielt die Erklärung eines Levels. synced = zeitgleich mit den Sprechblasen der Kinder
+// (die Zeilen kommen dann mit denselben Pausen wie im Spiel), sonst direkt hintereinander weg.
+async function playIntro(step, synced, lead) {
+  if (step < 0 || !STEPS[step]) return;
+  unlock(); stopSound();
+  const mine = run;
+  const lines = CLASS_INTRO[STEPS[step][0]] || [];
+  if (!lines.length) return;
+  const bufs = await Promise.all(lines.map(l => (l.f ? load(l.f).catch(() => null) : null)));
+  if (mine !== run) return;
+  const t0 = ac.currentTime + (lead || 0.2), first = synced ? 0 : lines[0].at;
+  let end = 0;
+  lines.forEach((l, i) => {
+    const at = t0 + (l.at - first);
+    if (bufs[i]) { const s = ac.createBufferSource(); s.buffer = bufs[i]; s.connect(gain); s.start(at); sources.push(s); }
+    timers.push(setTimeout(() => showLine(l.t), Math.max(0, (at - ac.currentTime) * 1000)));
+    end = Math.max(end, at + (l.d || 2) + 0.6);
+  });
+  timers.push(setTimeout(() => showLine(''), (end - ac.currentTime) * 1000));
+}
+// nächste Erklärung schon einmal laden, damit sie ohne Verzögerung startet
+function preload(step) {
+  if (!ac || !STEPS[step]) return;
+  for (const l of CLASS_INTRO[STEPS[step][0]] || []) if (l.f) load(l.f).catch(() => {});
+}
+
+// ---------------------------------------------------------------- Verbindung zum Server
+async function teacher(extra) {
+  if (!room) return;
+  let r;
+  try { r = await post('/api/class/teacher', Object.assign({ code: room.code, key: room.key }, extra || {})); }
+  catch (e) { return; }
+  if (r.status === 404 || r.status === 403 || r.body.ended) { leave(); return; }
+  if (r.status !== 200) return;
+  state = r.body;
+  if (lastStep !== null && state.step > lastStep && $('autoSound').checked) playIntro(state.step, true, extra && extra.action === 'next' ? 1.0 : 0.3);
+  lastStep = state.step;
+  preload(state.step + 1);
+  render();
+}
+function leave() {
+  room = null; state = null; lastStep = null;
+  sessionStorage.removeItem('klammiLehrer');
+  stopSound();
+  $('room').classList.add('hidden'); $('start').classList.remove('hidden');
+}
+function enter() {
+  $('start').classList.add('hidden'); $('room').classList.remove('hidden');
+  $('code').textContent = room.code;
+  $('joinUrl').textContent = location.host + '/k/' + room.code;
+  teacher();
+}
+
+function render() {
+  const s = state, step = s.step, last = STEPS.length - 1;
+  $('stepHead').textContent = step < 0 ? 'VOR DEM START' : 'LEVEL ' + step + ' VON ' + last;
+  $('stepName').textContent = step < 0 ? 'Noch nicht gestartet' : STEPS[step][1];
+  $('stepTask').textContent = step < 0 ? 'Warten Sie, bis alle Kinder beigetreten sind. Dann „Spiel starten“.' : STEPS[step][2];
+  const pct = s.active ? Math.round(s.done / s.active * 100) : 0;
+  $('fill').style.width = (step < 0 ? 0 : pct) + '%';
+  $('goal').style.left = 'calc(' + s.threshold + '% - 1px)';
+  $('count').textContent = step < 0 ? s.active + ' Geräte verbunden' : s.done + ' von ' + s.active + ' fertig (' + pct + ' %) – Ziel: ' + s.threshold + ' %';
+  $('next').textContent = step < 0 ? 'Spiel starten' : step >= last ? 'Letztes Level erreicht' : 'Weiter zum nächsten Level';
+  $('next').disabled = step >= last || (step < 0 && s.active === 0);
+  $('countdown').textContent = s.advanceIn ? 'Weiter in ' + Math.ceil(s.advanceIn / 1000) + ' …' : '';
+  $('hold').classList.toggle('hidden', !s.advanceIn);
+  $('play').disabled = step < 0;
+  // Einstellungen vom Server übernehmen (z. B. nach dem Neuladen), aber nicht während man gerade schiebt
+  if (document.activeElement !== $('threshold')) { $('threshold').value = s.threshold; $('thresholdVal').textContent = s.threshold; }
+  $('auto').checked = s.auto; $('lock').checked = s.lock;
+
+  const grid = $('grid');
+  grid.textContent = '';
+  $('empty').classList.toggle('hidden', s.students.length > 0);
+  const order = s.students.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  for (const k of order) {
+    const off = k.ago > 20000;
+    const done = k.at > step || (k.at === step && k.done);
+    let cls = '', text;
+    if (off) { cls = 'off'; text = 'nicht verbunden'; }
+    else if (step < 0 || k.at < 0) text = 'wartet auf den Start';
+    else if (done) { cls = 'done'; text = 'fertig'; }
+    else if (k.at < step) { cls = 'behind'; text = 'noch bei: ' + STEPS[k.at][1]; }
+    else if (k.idle > 45) { cls = 'stuck'; text = 'kommt seit ' + k.idle + ' s nicht weiter'; }
+    else text = 'spielt';
+    const card = document.createElement('div'); card.className = 'kid ' + cls;
+    const x = document.createElement('button'); x.className = 'small x'; x.textContent = '×'; x.title = 'Gerät aus der Klasse entfernen';
+    x.onclick = () => { if (confirm(k.name + ' aus der Klasse entfernen?')) teacher({ remove: k.id }); };
+    const name = document.createElement('b'); name.textContent = k.name;
+    const info = document.createElement('small'); info.textContent = text;
+    card.append(x, name, info);
+    grid.appendChild(card);
+  }
+}
+
+// ---------------------------------------------------------------- Bedienung
+$('create').onclick = async () => {
+  unlock();
+  $('msg').textContent = '';
+  let r;
+  try { r = await post('/api/class/create', {}); } catch (e) { $('msg').textContent = 'Der Server ist nicht erreichbar.'; return; }
+  if (r.status !== 200) { $('msg').textContent = r.body.error || 'Das hat nicht geklappt.'; return; }
+  room = { code: r.body.code, key: r.body.key };
+  $('guideBox').open = false;
+  sessionStorage.setItem('klammiLehrer', JSON.stringify(room));
+  enter();
+};
+$('joinForm').onsubmit = e => {
+  e.preventDefault();
+  const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length >= 4) location.href = '/k/' + c;
+};
+$('next').onclick = () => { unlock(); teacher({ action: 'next' }); };
+$('hold').onclick = () => teacher({ auto: false });
+$('play').onclick = () => { if (state) playIntro(state.step, false); };
+$('stop').onclick = stopSound;
+$('auto').onchange = () => teacher({ auto: $('auto').checked });
+$('lock').onchange = () => teacher({ lock: $('lock').checked });
+$('threshold').oninput = () => { $('thresholdVal').textContent = $('threshold').value; };
+$('threshold').onchange = () => teacher({ threshold: Number($('threshold').value) });
+$('volume').oninput = () => { if (gain) gain.gain.value = $('volume').value / 100; };
+$('end').onclick = async () => {
+  if (!confirm('Klasse wirklich beenden? Die Kinder können danach allein weiterspielen.')) return;
+  try { await post('/api/class/teacher', { code: room.code, key: room.key, action: 'end' }); } catch (e) { /* egal */ }
+  leave();
+};
+// Anleitung: Level-Tabelle füllen; während die Klasse läuft, ist die Anleitung eingeklappt
+for (const [i, s] of STEPS.entries()) {
+  const tr = document.createElement('tr');
+  for (const v of [i, s[1], s[2]]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+  document.querySelector('#levels tbody').appendChild(tr);
+}
+$('print').onclick = e => { e.preventDefault(); $('guideBox').open = true; window.print(); };
+if (room) $('guideBox').open = false;
+if (location.hash === '#join') $('joinCode').focus();
+if (room) enter();
+setInterval(() => { if (room) teacher(); }, 1000);
+</script>
+</body>
+</html>
